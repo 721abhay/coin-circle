@@ -1,0 +1,101 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../config/supabase_config.dart';
+
+/// Service class for authentication operations
+class AuthService {
+  final SupabaseClient _client = SupabaseConfig.client;
+
+  /// Sign up with email and password
+  Future<AuthResponse> signUp({
+    required String email,
+    required String password,
+    Map<String, dynamic>? userData,
+  }) async {
+    return await _client.auth.signUp(
+      email: email,
+      password: password,
+      data: userData,
+    );
+  }
+
+  /// Sign in with email and password
+  Future<AuthResponse> signIn({
+    required String email,
+    required String password,
+  }) async {
+    return await _client.auth.signInWithPassword(
+      email: email,
+      password: password,
+    );
+  }
+
+  /// Sign in with Google
+  Future<bool> signInWithGoogle() async {
+    return await _client.auth.signInWithOAuth(
+      OAuthProvider.google,
+      redirectTo: 'io.supabase.coincircle://login-callback/',
+    );
+  }
+
+  /// Sign in with Apple
+  Future<bool> signInWithApple() async {
+    return await _client.auth.signInWithOAuth(
+      OAuthProvider.apple,
+      redirectTo: 'io.supabase.coincircle://login-callback/',
+    );
+  }
+
+  /// Sign out
+  Future<void> signOut() async {
+    await _client.auth.signOut();
+  }
+
+  /// Send password reset email
+  Future<void> resetPassword(String email) async {
+    await _client.auth.resetPasswordForEmail(email);
+  }
+
+  /// Update user password
+  Future<UserResponse> updatePassword(String newPassword) async {
+    return await _client.auth.updateUser(
+      UserAttributes(password: newPassword),
+    );
+  }
+
+  /// Get current user
+  User? get currentUser => _client.auth.currentUser;
+
+  /// Check if user is authenticated
+  bool get isAuthenticated => currentUser != null;
+
+  /// Get auth state changes stream
+  Stream<AuthState> get authStateChanges => _client.auth.onAuthStateChange;
+
+  /// Resend email verification
+  Future<void> resendVerificationEmail() async {
+    final user = currentUser;
+    if (user != null && user.email != null) {
+      await _client.auth.resend(
+        type: OtpType.signup,
+        email: user.email!,
+      );
+    }
+  }
+
+  /// Update user metadata
+  Future<UserResponse> updateUserMetadata(Map<String, dynamic> data) async {
+    return await _client.auth.updateUser(
+      UserAttributes(data: data),
+    );
+  }
+
+  /// Delete user account
+  Future<void> deleteAccount() async {
+    final user = currentUser;
+    if (user != null) {
+      // Note: This requires admin privileges or RPC function
+      // You'll need to create a Supabase Edge Function for this
+      await _client.rpc('delete_user_account');
+    }
+  }
+}
