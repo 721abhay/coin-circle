@@ -1,0 +1,13 @@
+{
+  "dart.analysisExcludedFolders": [
+    "**/dev/**",
+    "**/packages/**",
+    "**/third_party/**",
+    "**/build/**",
+    "**/bin/cache/**",
+    "**/.git/**",
+    "**/.dart_tool/**",
+    "**/out/**"
+  ],
+  "dart.flutterSdkPath": "C:\\Users\\ABHAY\\coin circle\\flutter"
+}
