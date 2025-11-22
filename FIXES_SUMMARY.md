@@ -16,14 +16,15 @@
 ## 3. 🎫 Support Ticket System Implemented
 - **Issue**: No way to submit tickets or for admin to see them.
 - **Fix**:
-    - **User Side**: Created `SubmitTicketScreen` (accessible via Help & Support).
-    - **Admin Side**: Created `AdminTicketsView` in the new Admin Dashboard to view, filter, and manage tickets.
+    - **User Side**: Created `SubmitTicketScreen` (accessible via Help & Support AND Settings -> Report a Problem).
+    - **Admin Side**: Created `AdminTicketsView` in the new Admin Dashboard to view, filter, and manage tickets. Added refresh capability.
 
 ## 4. 👑 Admin Dashboard Overhaul
 - **Issue**: Admin UI was basic and missing controls.
 - **Fix**:
     - **New UI**: Implemented a "Command Center" with sidebar navigation.
     - **Features**: Added User Management (Ban/Unban), Pool Management (God Mode), Financial Control, and System Settings.
+    - **Backend**: Fully connected to Supabase tables (profiles, pools, tickets).
 
 ---
 
@@ -32,8 +33,8 @@
 1. **Restart the App**: Perform a hot restart (press `R`).
 2. **Create a Pool**: Create a new pool -> Publish. Verify it appears in "My Pools".
 3. **Edit Profile**: Go to Profile -> Edit. Change name, add bio, upload photo -> Save.
-4. **Submit Ticket**: Go to Profile -> Help & Support -> Chat with Support -> Submit a ticket.
-5. **Admin Check**: Log in as Admin -> Go to Tickets tab -> Verify the new ticket is visible.
+4. **Report Problem**: Go to Settings -> Report a Problem -> Submit.
+5. **Admin Check**: Log in as Admin -> Go to Tickets tab -> Click Refresh -> Verify the new ticket is visible.
 
 ---
 
@@ -41,6 +42,8 @@
 - `lib/core/services/pool_service.dart` (Pool Fix)
 - `lib/core/services/auth_service.dart` (Profile Fix)
 - `lib/features/profile/presentation/screens/edit_profile_screen.dart` (Profile UI)
+- `lib/features/profile/presentation/screens/settings_screen.dart` (Settings Link)
+- `lib/features/profile/presentation/screens/profile_screen.dart` (Profile Link)
 - `lib/features/admin/presentation/screens/admin_dashboard_screen.dart` (Admin UI)
 - `lib/core/router/app_router.dart` (Navigation)
 
