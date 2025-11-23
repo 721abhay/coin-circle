@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:animate_do/animate_do.dart';
+import '../../../../core/services/wallet_management_service.dart';
 
 class PayoutScreen extends StatefulWidget {
   final double amount;
@@ -16,12 +17,42 @@ class _PayoutScreenState extends State<PayoutScreen> {
   int _currentStep = 0;
   int _selectedMethod = 0;
   bool _isProcessing = false;
+  List<Map<String, dynamic>> _bankAccounts = [];
+  String? _selectedBankAccountId;
+  bool _isLoading = true;
 
   // Bank Details Controllers
   final _bankNameController = TextEditingController();
   final _accountHolderController = TextEditingController();
   final _accountNumberController = TextEditingController();
-  final _routingNumberController = TextEditingController();
+  final _routingNumberController = TextEditingController(); // IFSC for India
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBankAccounts();
+  }
+
+  Future<void> _loadBankAccounts() async {
+    try {
+      final accounts = await WalletManagementService.getBankAccounts();
+      if (mounted) {
+        setState(() {
+          _bankAccounts = accounts;
+          if (_bankAccounts.isNotEmpty) {
+            _selectedBankAccountId = _bankAccounts.first['id'];
+          }
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        // Don't show error snackbar here to avoid clutter, just log or silent fail
+        print('Error loading bank accounts: $e');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -184,10 +215,42 @@ class _PayoutScreenState extends State<PayoutScreen> {
 
   Widget _buildDetailsStep() {
     if (_selectedMethod != 0) {
-      return const Center(child: Text('No additional details required for this method.'));
+      return const Center(child: Text('Only Bank Transfer is currently supported.'));
     }
+    
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_bankAccounts.isNotEmpty) ...[
+          Text(
+            'Select Bank Account',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            value: _selectedBankAccountId,
+            decoration: const InputDecoration(border: OutlineInputBorder()),
+            items: _bankAccounts.map((account) {
+              return DropdownMenuItem<String>(
+                value: account['id'],
+                child: Text('${account['bank_name']} - ${account['account_number'].toString().substring(account['account_number'].toString().length - 4)}'),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedBankAccountId = value;
+              });
+            },
+          ),
+          const SizedBox(height: 24),
+          const Text('OR Enter New Account Details', style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+        ],
+        
         TextField(
           controller: _bankNameController,
           decoration: const InputDecoration(labelText: 'Bank Name', border: OutlineInputBorder()),
@@ -206,8 +269,8 @@ class _PayoutScreenState extends State<PayoutScreen> {
         const SizedBox(height: 16),
         TextField(
           controller: _routingNumberController,
-          decoration: const InputDecoration(labelText: 'Routing Number', border: OutlineInputBorder()),
-          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'IFSC Code', border: OutlineInputBorder()),
+          keyboardType: TextInputType.text,
         ),
       ],
     );
@@ -222,7 +285,7 @@ class _PayoutScreenState extends State<PayoutScreen> {
           style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
-        _buildDetailRow('Amount', '\$${(widget.amount - 5.00).toStringAsFixed(2)}'),
+        _buildDetailRow('Amount', '₹${(widget.amount - 5.00).toStringAsFixed(2)}'),
         const SizedBox(height: 12),
         _buildDetailRow('Method', _getMethodName(_selectedMethod)),
         const SizedBox(height: 12),
@@ -283,7 +346,7 @@ class _PayoutScreenState extends State<PayoutScreen> {
           ),
         ),
         Text(
-          '${isDeduction ? '-' : ''}\$${value.abs().toStringAsFixed(2)}',
+          '${isDeduction ? '-' : ''}₹${value.abs().toStringAsFixed(2)}',
           style: TextStyle(
             fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
             fontSize: isTotal ? 16 : 14,
@@ -322,17 +385,52 @@ class _PayoutScreenState extends State<PayoutScreen> {
 
   void _processPayout() async {
     setState(() => _isProcessing = true);
-    await Future.delayed(const Duration(seconds: 2)); // Simulate API
-    if (mounted) {
-      setState(() => _isProcessing = false);
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => PayoutSuccessScreen(
-            amount: widget.amount - 5.00,
-            method: _getMethodName(_selectedMethod),
-          ),
-        ),
+    
+    try {
+      if (_selectedMethod != 0) {
+        throw Exception('Only Bank Transfer is currently supported');
+      }
+
+      String bankAccountId;
+
+      // If manual details entered, create new account first
+      if (_bankNameController.text.isNotEmpty && _accountNumberController.text.isNotEmpty) {
+        bankAccountId = await WalletManagementService.addBankAccount(
+          accountHolderName: _accountHolderController.text,
+          accountNumber: _accountNumberController.text,
+          bankName: _bankNameController.text,
+          ifscCode: _routingNumberController.text,
+          accountType: 'savings', // Default
+        );
+      } else if (_selectedBankAccountId != null) {
+        bankAccountId = _selectedBankAccountId!;
+      } else {
+        throw Exception('Please select or enter bank account details');
+      }
+
+      await WalletManagementService.requestWithdrawal(
+        amount: widget.amount,
+        bankAccountId: bankAccountId,
       );
+
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => PayoutSuccessScreen(
+              amount: widget.amount - 5.00,
+              method: _getMethodName(_selectedMethod),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Payout failed: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 }
@@ -374,7 +472,7 @@ class PayoutSuccessScreen extends StatelessWidget {
               FadeInUp(
                 delay: const Duration(milliseconds: 200),
                 child: Text(
-                  'Your withdrawal of \$${amount.toStringAsFixed(2)} via $method is being processed.',
+                  'Your withdrawal of ₹${amount.toStringAsFixed(2)} via $method is being processed.',
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Colors.grey, fontSize: 16),
                 ),

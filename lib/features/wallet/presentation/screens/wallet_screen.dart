@@ -1,11 +1,55 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import '../../../../core/services/wallet_service.dart';
 
-class WalletScreen extends StatelessWidget {
+class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
 
   @override
+  State<WalletScreen> createState() => _WalletScreenState();
+}
+
+class _WalletScreenState extends State<WalletScreen> {
+  Map<String, dynamic>? _wallet;
+  List<Map<String, dynamic>> _transactions = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadWalletData();
+  }
+
+  Future<void> _loadWalletData() async {
+    try {
+      final wallet = await WalletService.getWallet();
+      final transactions = await WalletService.getTransactions(limit: 5);
+      
+      if (mounted) {
+        setState(() {
+          _wallet = wallet;
+          _transactions = transactions;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading wallet: $e')),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Wallet'),
@@ -70,21 +114,22 @@ class WalletScreen extends StatelessWidget {
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             'Total Balance',
-            style: TextStyle(color: Colors.white70, fontSize: 16),
+            style: TextStyle(color: Colors.white70, fontSize: 14),
           ),
           const SizedBox(height: 8),
-          const Text(
-            '\$3,734.56',
-            style: TextStyle(
+          Text(
+            NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(_wallet?['balance'] ?? 0.0),
+            style: const TextStyle(
               color: Colors.white,
-              fontSize: 40,
+              fontSize: 36,
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -144,13 +189,13 @@ class WalletScreen extends StatelessWidget {
             style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          _buildBalanceRow('Available Balance', '\$2,450.00', Colors.green, Icons.account_balance_wallet),
+          _buildBalanceRow('Available Balance', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(_wallet?['balance'] ?? 0.0), Colors.green, Icons.account_balance_wallet),
           const Divider(height: 24),
-          _buildBalanceRow('Locked in Pools', '\$1,200.00', Colors.orange, Icons.lock),
+          _buildBalanceRow('Locked in Pools', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(_wallet?['locked_balance'] ?? 0.0), Colors.orange, Icons.lock),
           const Divider(height: 24),
-          _buildBalanceRow('Pending Transactions', '\$84.56', Colors.blue, Icons.pending),
+          _buildBalanceRow('Pending Transactions', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(0.0), Colors.blue, Icons.pending), // TODO: Calculate pending
           const Divider(height: 24),
-          _buildBalanceRow('Total Winnings', '\$5,000.00', Colors.purple, Icons.emoji_events),
+          _buildBalanceRow('Total Winnings', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(_wallet?['total_winnings'] ?? 0.0), Colors.purple, Icons.emoji_events),
         ],
       ),
     );
@@ -241,12 +286,19 @@ class WalletScreen extends StatelessWidget {
   }
 
   Widget _buildTransactionList() {
+    if (_transactions.isEmpty) {
+      return const Center(child: Text('No recent transactions'));
+    }
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: 5,
+      itemCount: _transactions.length,
       itemBuilder: (context, index) {
-        final isCredit = index % 2 == 0;
+        final transaction = _transactions[index];
+        final isCredit = transaction['amount'] > 0; // Assuming positive for credit, negative for debit
+        final amount = (transaction['amount'] as num).abs();
+        final date = DateTime.parse(transaction['created_at']);
+        
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
@@ -257,10 +309,10 @@ class WalletScreen extends StatelessWidget {
                 color: isCredit ? Colors.green : Colors.red,
               ),
             ),
-            title: Text(isCredit ? 'Deposit' : 'Contribution Payment'),
-            subtitle: Text('Nov ${20 - index}, 2025 • Office Savings Circle'),
+            title: Text(transaction['description'] ?? 'Transaction'),
+            subtitle: Text('${DateFormat('MMM d, yyyy').format(date)} • ${transaction['status'] ?? 'Completed'}'),
             trailing: Text(
-              isCredit ? '+\$500.00' : '-\$100.00',
+              '${isCredit ? '+' : '-'}₹${amount.toStringAsFixed(2)}',
               style: TextStyle(
                 color: isCredit ? Colors.green : Colors.red,
                 fontWeight: FontWeight.bold,
@@ -272,170 +324,248 @@ class WalletScreen extends StatelessWidget {
     );
   }
 
-  void _showAddMoneyDialog(BuildContext context) {
+  Future<void> _showAddMoneyDialog(BuildContext context) async {
     final TextEditingController amountController = TextEditingController();
-    String selectedAmount = '';
+    String selectedMethod = 'bank_transfer';
 
-    showDialog(
+    await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Money to Wallet'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Quick Amounts'),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                children: [
-                  _buildAmountChip('\$50', () {
-                    amountController.text = '50';
-                  }),
-                  _buildAmountChip('\$100', () {
-                    amountController.text = '100';
-                  }),
-                  _buildAmountChip('\$500', () {
-                    amountController.text = '500';
-                  }),
-                  _buildAmountChip('\$1000', () {
-                    amountController.text = '1000';
-                  }),
-                ],
-              ),
-              const SizedBox(height: 24),
-              TextField(
-                controller: amountController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Custom Amount',
-                  prefixText: '\$ ',
-                  border: OutlineInputBorder(),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Add Money to Wallet'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Quick Amounts'),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    _buildAmountChip('₹50', () {
+                      amountController.text = '50';
+                    }),
+                    _buildAmountChip('₹100', () {
+                      amountController.text = '100';
+                    }),
+                    _buildAmountChip('₹500', () {
+                      amountController.text = '500';
+                    }),
+                    _buildAmountChip('₹1000', () {
+                      amountController.text = '1000';
+                    }),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 16),
-              const Text('Payment Method', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.credit_card),
-                title: const Text('•••• 4242'),
-                subtitle: const Text('Visa'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {},
-              ),
-            ],
+                const SizedBox(height: 24),
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Custom Amount',
+                    prefixText: '₹ ',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text('Payment Method', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: selectedMethod,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'bank_transfer', child: Text('Bank Transfer')),
+                    DropdownMenuItem(value: 'card', child: Text('Credit/Debit Card')),
+                    DropdownMenuItem(value: 'upi', child: Text('UPI')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => selectedMethod = value);
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final amount = double.tryParse(amountController.text);
+                if (amount == null || amount <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a valid amount')),
+                  );
+                  return;
+                }
+
+                Navigator.pop(dialogContext);
+                
+                try {
+                  await WalletService.deposit(
+                    amount: amount,
+                    method: selectedMethod,
+                  );
+                  
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Successfully added ₹${amount.toStringAsFixed(2)} to wallet')),
+                    );
+                    _loadWalletData(); // Refresh wallet data
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                    );
+                  }
+                }
+              },
+              child: const Text('Add Money'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Adding \$${amountController.text} to wallet...')),
-              );
-            },
-            child: const Text('Add Money'),
-          ),
-        ],
       ),
     );
   }
 
-  void _showWithdrawDialog(BuildContext context) {
+  Future<void> _showWithdrawDialog(BuildContext context) async {
     final TextEditingController amountController = TextEditingController();
+    final TextEditingController bankDetailsController = TextEditingController();
+    String selectedMethod = 'bank_transfer';
 
-    showDialog(
+    final wallet = _wallet;
+    final availableBalance = wallet != null ? (wallet['available_balance'] as num).toDouble() : 0.0;
+
+    await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Withdraw Funds'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline, color: Colors.blue, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text('Available: \$2,450.00', style: TextStyle(fontWeight: FontWeight.bold)),
-                          Text('Min: \$10 • Max: \$5,000/day', style: TextStyle(fontSize: 12)),
-                        ],
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Withdraw Funds'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Available: ₹${availableBalance.toStringAsFixed(2)}', 
+                                style: const TextStyle(fontWeight: FontWeight.bold)),
+                            const Text('Min: ₹10 • Processing: 1-3 days', 
+                                style: TextStyle(fontSize: 12)),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Amount to Withdraw',
+                    prefixText: '₹ ',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: bankDetailsController,
+                  decoration: const InputDecoration(
+                    labelText: 'Bank Account Details',
+                    hintText: 'Account number or UPI ID',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: selectedMethod,
+                  decoration: const InputDecoration(
+                    labelText: 'Withdrawal Method',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'bank_transfer', child: Text('Bank Transfer')),
+                    DropdownMenuItem(value: 'upi', child: Text('UPI')),
                   ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => selectedMethod = value);
+                    }
+                  },
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: amountController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Amount to Withdraw',
-                  prefixText: '\$ ',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text('Destination Account', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.account_balance),
-                title: const Text('Chase Bank'),
-                subtitle: const Text('•••• 1234'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {},
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('Processing Fee'),
-                  Text('\$2.50', style: TextStyle(fontWeight: FontWeight.bold)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text('Expected Arrival'),
-                  Text('1-3 business days', style: TextStyle(color: Colors.grey)),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final amount = double.tryParse(amountController.text);
+                if (amount == null || amount <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter a valid amount')),
+                  );
+                  return;
+                }
+
+                if (bankDetailsController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter bank details')),
+                  );
+                  return;
+                }
+
+                Navigator.pop(dialogContext);
+                
+                try {
+                  await WalletService.withdraw(
+                    amount: amount,
+                    method: selectedMethod,
+                    bankDetails: bankDetailsController.text.trim(),
+                  );
+                  
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Withdrawal request submitted. Pending admin approval.'),
+                      ),
+                    );
+                    _loadWalletData(); // Refresh wallet data
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                    );
+                  }
+                }
+              },
+              child: const Text('Withdraw'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Withdrawing \$${amountController.text}...')),
-              );
-            },
-            child: const Text('Withdraw'),
-          ),
-        ],
       ),
     );
   }

@@ -1,19 +1,28 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:animate_do/animate_do.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/services/winner_service.dart';
 
-class WinnerSelectionScreen extends StatefulWidget {
-  const WinnerSelectionScreen({super.key});
+class WinnerSelectionScreen extends ConsumerStatefulWidget {
+  final String poolId;
+
+  const WinnerSelectionScreen({
+    super.key,
+    required this.poolId,
+  });
 
   @override
-  State<WinnerSelectionScreen> createState() => _WinnerSelectionScreenState();
+  ConsumerState<WinnerSelectionScreen> createState() => _WinnerSelectionScreenState();
 }
 
 enum DrawState { preDraw, liveDraw, completed }
 
 class Member {
+  final String id;
   final String name;
   final bool hasWon;
   final int? wonCycle;
@@ -21,41 +30,78 @@ class Member {
   final double? wonAmount;
 
   Member({
+    required this.id,
     required this.name,
     this.hasWon = false,
     this.wonCycle,
     this.wonDate,
     this.wonAmount,
   });
+
+  factory Member.fromJson(Map<String, dynamic> json) {
+    final profile = json['profiles'] as Map<String, dynamic>?;
+    final name = profile != null 
+        ? '${profile['first_name']} ${profile['last_name']}'
+        : 'Unknown Member';
+    
+    return Member(
+      id: json['user_id'],
+      name: name,
+      hasWon: json['has_won'] ?? false,
+      // These fields would need to be joined from winner_history if we want full details
+      // For now, we'll just use the has_won flag from pool_members
+    );
+  }
 }
 
-class _WinnerSelectionScreenState extends State<WinnerSelectionScreen> {
+class _WinnerSelectionScreenState extends ConsumerState<WinnerSelectionScreen> {
   // Theme colors from the design
   final Color _primaryColor = const Color(0xFFF97A53);
   final Color _lightPrimaryColor = const Color(0xFFFFF2EF);
   final Color _scaffoldBgColor = const Color(0xFFF9F9F9);
 
   DrawState _currentState = DrawState.preDraw;
-  int _countdown = 3;
   String _currentName = "Waiting...";
   String _winnerName = "";
+  double _winningAmount = 0;
   Timer? _timer;
-
-  final List<Member> _allMembers = [
-    Member(name: 'Alice Johnson', hasWon: true, wonCycle: 1, wonDate: 'Oct 15', wonAmount: 2500),
-    Member(name: 'Bob Smith', hasWon: true, wonCycle: 2, wonDate: 'Nov 15', wonAmount: 2500),
-    Member(name: 'Charlie Brown'),
-    Member(name: 'Diana Prince'),
-    Member(name: 'Evan Wright'),
-    Member(name: 'Fiona Green'),
-    Member(name: 'George King'),
-    Member(name: 'Hannah White'),
-    Member(name: 'Ian Moore'),
-    Member(name: 'Julia Davis'),
-  ];
+  List<Member> _allMembers = [];
+  bool _isLoading = true;
 
   List<Member> get _eligibleMembers => _allMembers.where((m) => !m.hasWon).toList();
   List<Member> get _pastWinners => _allMembers.where((m) => m.hasWon).toList();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchMembers();
+  }
+
+  Future<void> _fetchMembers() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final response = await supabase
+          .from('pool_members')
+          .select('*, profiles(first_name, last_name)')
+          .eq('pool_id', widget.poolId);
+
+      if (mounted) {
+        setState(() {
+          _allMembers = (response as List)
+              .map((data) => Member.fromJson(data))
+              .toList();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error fetching members: $e')),
+        );
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -63,24 +109,65 @@ class _WinnerSelectionScreenState extends State<WinnerSelectionScreen> {
     super.dispose();
   }
 
-  void _startDraw() {
+  Future<void> _startDraw() async {
     setState(() {
       _currentState = DrawState.liveDraw;
     });
 
+    // Start the animation loop
     _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
-      setState(() {
-        _currentName = _eligibleMembers[Random().nextInt(_eligibleMembers.length)].name;
-      });
+      if (_eligibleMembers.isNotEmpty) {
+        setState(() {
+          _currentName = _eligibleMembers[Random().nextInt(_eligibleMembers.length)].name;
+        });
+      }
     });
 
-    Future.delayed(const Duration(seconds: 3), () {
+    try {
+      final supabase = Supabase.instance.client;
+      
+      // Get the next round number by checking winner history count + 1
+      final historyResponse = await supabase
+          .from('winner_history')
+          .select('*')
+          .eq('pool_id', widget.poolId);
+      final nextRound = (historyResponse as List).length + 1;
+
+      // Use WinnerService to select winner
+      await WinnerService.selectRandomWinner(widget.poolId, nextRound);
+
+      // Fetch the winner's details from winner_history
+      final winnerData = await supabase
+          .from('winner_history')
+          .select('*, profiles(first_name, last_name)')
+          .eq('pool_id', widget.poolId)
+          .eq('round_number', nextRound)
+          .single();
+
+      final winnerProfile = winnerData['profiles'];
+      final winnerName = '${winnerProfile['first_name']} ${winnerProfile['last_name']}';
+      final winningAmount = (winnerData['amount_won'] as num).toDouble();
+      
+      // Stop animation and show result
       _timer?.cancel();
-      setState(() {
-        _winnerName = _eligibleMembers[Random().nextInt(_eligibleMembers.length)].name;
-        _currentState = DrawState.completed;
-      });
-    });
+      if (mounted) {
+        setState(() {
+          _winnerName = winnerName;
+          _winningAmount = winningAmount;
+          _currentState = DrawState.completed;
+        });
+      }
+    } catch (e) {
+      _timer?.cancel();
+      if (mounted) {
+        setState(() {
+          _currentState = DrawState.preDraw;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error selecting winner: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   @override
@@ -93,7 +180,9 @@ class _WinnerSelectionScreenState extends State<WinnerSelectionScreen> {
         foregroundColor: Colors.black87,
         elevation: 0,
       ),
-      body: _buildBody(),
+      body: _isLoading 
+          ? const Center(child: CircularProgressIndicator()) 
+          : _buildBody(),
     );
   }
 
@@ -199,7 +288,7 @@ class _WinnerSelectionScreenState extends State<WinnerSelectionScreen> {
                 leading: CircleAvatar(
                   backgroundColor: color.withOpacity(isEligible ? 0.1 : 0.05),
                   child: Text(
-                    member.name[0],
+                    member.name.isNotEmpty ? member.name[0] : '?',
                     style: TextStyle(color: color, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -212,22 +301,12 @@ class _WinnerSelectionScreenState extends State<WinnerSelectionScreen> {
                 ),
                 subtitle: member.hasWon
                     ? Text(
-                        'Won Cycle ${member.wonCycle} • ${member.wonDate}',
+                        'Won previously',
                         style: const TextStyle(fontSize: 12, color: Colors.grey),
                       )
                     : null,
                 trailing: member.hasWon
-                    ? Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '\$${member.wonAmount?.toStringAsFixed(0)}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
-                          ),
-                          const SizedBox(width: 8),
-                          const Icon(Icons.emoji_events, color: Colors.amber, size: 20),
-                        ],
-                      )
+                    ? const Icon(Icons.emoji_events, color: Colors.amber, size: 20)
                     : Icon(Icons.check_circle_outline, color: color, size: 20),
               );
             },
@@ -251,7 +330,7 @@ class _WinnerSelectionScreenState extends State<WinnerSelectionScreen> {
             border: Border.all(color: _primaryColor, width: 4),
           ),
           child: Text(
-            _currentName.split(' ').first[0],
+            _currentName.isNotEmpty ? _currentName.split(' ').first[0] : '?',
             style: TextStyle(fontSize: 64, fontWeight: FontWeight.bold, color: _primaryColor),
           ),
         ),
@@ -296,7 +375,7 @@ class _WinnerSelectionScreenState extends State<WinnerSelectionScreen> {
           FadeInUp(
             delay: const Duration(milliseconds: 400),
             child: Text(
-              'You won \$2,500!',
+              'You won ₹${_winningAmount.toStringAsFixed(0)}!',
               style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: _primaryColor),
             ),
           ),

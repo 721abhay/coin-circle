@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:animate_do/animate_do.dart'; // I'll need to add this package or use standard animations. I'll use standard for now to avoid extra deps if not needed, but animate_do is great. I'll stick to standard for now.
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -27,12 +29,33 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     _controller.forward();
 
-    // Navigate after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        context.go('/onboarding');
+    // Check auth state and navigate accordingly
+    _checkAuthAndNavigate();
+  }
+
+  Future<void> _checkAuthAndNavigate() async {
+    await Future.delayed(const Duration(seconds: 3));
+    
+    if (mounted) {
+      final session = Supabase.instance.client.auth.currentSession;
+      
+      if (session != null) {
+        // User is authenticated, go to home
+        context.go('/home');
+      } else {
+        // Check if onboarding has been completed
+        final prefs = await SharedPreferences.getInstance();
+        final onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
+        
+        if (onboardingCompleted) {
+          // Skip onboarding, go directly to login
+          context.go('/login');
+        } else {
+          // Show onboarding
+          context.go('/onboarding');
+        }
       }
-    });
+    }
   }
 
   @override
@@ -73,7 +96,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
               ),
             ),
             const SizedBox(height: 24),
-            FadeInUp( // Using a simple custom animation wrapper if animate_do isn't there, but I'll just use standard AnimatedOpacity/Builder for simplicity or assume I can add animate_do later. I'll just use standard widgets.
+            FadeInUp(
               child: Text(
                 'Coin Circle',
                 style: Theme.of(context).textTheme.displaySmall?.copyWith(
@@ -100,7 +123,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 }
 
-// Simple FadeInUp implementation to avoid external dep for now
 class FadeInUp extends StatefulWidget {
   final Widget child;
   final Duration duration;

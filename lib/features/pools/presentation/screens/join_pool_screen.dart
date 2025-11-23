@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import '../../../../core/services/pool_service.dart';
 
 class JoinPoolScreen extends StatefulWidget {
   const JoinPoolScreen({super.key});
@@ -14,7 +16,7 @@ class _JoinPoolScreenState extends State<JoinPoolScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -30,16 +32,21 @@ class _JoinPoolScreenState extends State<JoinPoolScreen> with SingleTickerProvid
         title: const Text('Join a Pool'),
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
           tabs: const [
-            Tab(text: 'Browse Pools'),
-            Tab(text: 'Have a Code?'),
+            Tab(text: 'Discover'),
+            Tab(text: 'Browse'),
+            Tab(text: 'Map View'),
+            Tab(text: 'Have Code?'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
+          _DiscoverTab(),
           _BrowsePoolsTab(),
+          _MapViewTab(),
           _JoinByCodeTab(),
         ],
       ),
@@ -47,7 +54,173 @@ class _JoinPoolScreenState extends State<JoinPoolScreen> with SingleTickerProvid
   }
 }
 
-class _BrowsePoolsTab extends StatelessWidget {
+class _DiscoverTab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildSectionHeader(context, 'Trending Now'),
+        SizedBox(
+          height: 180,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: 5,
+            itemBuilder: (context, index) => _buildTrendingCard(context, index),
+          ),
+        ),
+        const SizedBox(height: 24),
+        _buildSectionHeader(context, 'Recommended for You'),
+        _buildRecommendedCard(context, 'High Savers Club', '₹5,000/month', '98% Match'),
+        _buildRecommendedCard(context, 'Vacation Fund', '₹2,000/month', '95% Match'),
+        const SizedBox(height: 24),
+        _buildSectionHeader(context, 'Categories'),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _buildCategoryChip(context, 'Travel', Icons.flight),
+            _buildCategoryChip(context, 'Gadgets', Icons.devices),
+            _buildCategoryChip(context, 'Emergency', Icons.medical_services),
+            _buildCategoryChip(context, 'Education', Icons.school),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+    );
+  }
+
+  Widget _buildTrendingCard(BuildContext context, int index) {
+    return Container(
+      width: 140,
+      margin: const EdgeInsets.only(right: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            height: 80,
+            decoration: BoxDecoration(
+              color: Colors.primaries[index % Colors.primaries.length].withOpacity(0.2),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            ),
+            child: Center(child: Icon(Icons.trending_up, size: 32, color: Colors.primaries[index % Colors.primaries.length])),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Pool #${index + 100}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text('₹${(index + 1) * 1000}/mo', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(Icons.star, size: 12, color: Colors.amber),
+                    Text(' 4.${9 - index}', style: const TextStyle(fontSize: 10)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecommendedCard(BuildContext context, String title, String amount, String match) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: CircleAvatar(child: Text(title[0])),
+        title: Text(title),
+        subtitle: Text(amount),
+        trailing: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.green.shade100,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(match, style: TextStyle(color: Colors.green.shade800, fontSize: 12, fontWeight: FontWeight.bold)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryChip(BuildContext context, String label, IconData icon) {
+    return Chip(
+      avatar: Icon(icon, size: 16),
+      label: Text(label),
+      backgroundColor: Colors.grey.shade100,
+    );
+  }
+}
+
+class _MapViewTab extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.map_outlined, size: 64, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          const Text('Map View', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          const Text('Find pools near you (Coming Soon)', style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () {},
+            icon: const Icon(Icons.my_location),
+            label: const Text('Use Current Location'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BrowsePoolsTab extends StatefulWidget {
+  @override
+  State<_BrowsePoolsTab> createState() => _BrowsePoolsTabState();
+}
+
+class _BrowsePoolsTabState extends State<_BrowsePoolsTab> {
+  List<Map<String, dynamic>> _pools = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPools();
+  }
+
+  Future<void> _loadPools() async {
+    try {
+      final pools = await PoolService.getPublicPools();
+      if (mounted) {
+        setState(() {
+          _pools = pools;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -68,6 +241,9 @@ class _BrowsePoolsTab extends StatelessWidget {
                     filled: true,
                     fillColor: Colors.grey.shade100,
                   ),
+                  onChanged: (value) {
+                    // TODO: Implement search
+                  },
                 ),
               ),
               const SizedBox(width: 12),
@@ -85,21 +261,26 @@ class _BrowsePoolsTab extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: 5,
-            itemBuilder: (context, index) {
-              return _PoolListItem(
-                name: 'Community Savings ${index + 1}',
-                creator: 'John Doe',
-                members: '${index + 2}/10',
-                amount: (index + 1) * 100,
-                duration: 10,
-                rating: 4.5,
-                onTap: () => _showJoinPreview(context),
-              );
-            },
-          ),
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _pools.isEmpty
+                  ? const Center(child: Text('No pools found'))
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: _pools.length,
+                      itemBuilder: (context, index) {
+                        final pool = _pools[index];
+                        return _PoolListItem(
+                          name: pool['name'],
+                          creator: 'Admin', // Creator name not always available in simple join query
+                          members: '${pool['current_members']}/${pool['max_members']}',
+                          amount: (pool['contribution_amount'] as num).toInt(),
+                          duration: pool['total_rounds'],
+                          rating: 4.5, // Placeholder
+                          onTap: () => _showJoinPreview(context, pool),
+                        );
+                      },
+                    ),
         ),
       ],
     );
@@ -136,7 +317,7 @@ class _BrowsePoolsTab extends StatelessWidget {
     );
   }
 
-  void _showJoinPreview(BuildContext context) {
+  void _showJoinPreview(BuildContext context, Map<String, dynamic> pool) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -146,7 +327,7 @@ class _BrowsePoolsTab extends StatelessWidget {
         minChildSize: 0.5,
         maxChildSize: 0.95,
         expand: false,
-        builder: (context, scrollController) => _PoolPreviewSheet(scrollController: scrollController),
+        builder: (context, scrollController) => _PoolPreviewSheet(scrollController: scrollController, pool: pool),
       ),
     );
   }
@@ -279,7 +460,7 @@ class _PoolListItem extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildInfoItem(context, Icons.attach_money, '\$$amount', 'Monthly'),
+                  _buildInfoItem(context, Icons.attach_money, '₹$amount', 'Monthly'),
                   _buildInfoItem(context, Icons.calendar_today, '$duration', 'Months'),
                   _buildInfoItem(context, Icons.people, members, 'Joined'),
                 ],
@@ -318,8 +499,9 @@ class _PoolListItem extends StatelessWidget {
 
 class _PoolPreviewSheet extends StatelessWidget {
   final ScrollController scrollController;
+  final Map<String, dynamic> pool;
 
-  const _PoolPreviewSheet({required this.scrollController});
+  const _PoolPreviewSheet({required this.scrollController, required this.pool});
 
   @override
   Widget build(BuildContext context) {
@@ -353,9 +535,9 @@ class _PoolPreviewSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Community Savings', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(pool['name'], style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    const Text('Created by John Doe • 4.5 ★'),
+                    const Text('Created by Admin • 4.5 ★'),
                   ],
                 ),
               ),
@@ -364,12 +546,12 @@ class _PoolPreviewSheet extends StatelessWidget {
           const SizedBox(height: 32),
           _buildSectionTitle(context, 'Pool Details'),
           const SizedBox(height: 16),
-          _buildDetailRow('Contribution', '\$100 / month'),
-          _buildDetailRow('Duration', '10 months'),
-          _buildDetailRow('Total Payout', '\$1,000'),
-          _buildDetailRow('Start Date', 'Dec 1, 2025'),
+          _buildDetailRow('Contribution', '₹${pool['contribution_amount']} / ${pool['frequency']}'),
+          _buildDetailRow('Duration', '${pool['total_rounds']} cycles'),
+          _buildDetailRow('Total Payout', '₹${(pool['contribution_amount'] as num) * (pool['total_rounds'] as int)}'),
+          _buildDetailRow('Start Date', DateFormat('MMM d, yyyy').format(DateTime.parse(pool['start_date']))),
           const SizedBox(height: 32),
-          _buildSectionTitle(context, 'Members (2/10)'),
+          _buildSectionTitle(context, 'Members (${pool['current_members']}/${pool['max_members']})'),
           const SizedBox(height: 16),
           SizedBox(
             height: 60,
@@ -391,7 +573,7 @@ class _PoolPreviewSheet extends StatelessWidget {
           const SizedBox(height: 32),
           _buildSectionTitle(context, 'Rules & Policies'),
           const SizedBox(height: 16),
-          _buildRuleItem(Icons.check_circle_outline, 'Late payments incur a \$5 fee.'),
+          _buildRuleItem(Icons.check_circle_outline, 'Late payments incur a ₹ fee.'),
           _buildRuleItem(Icons.check_circle_outline, 'Winner selected by random draw.'),
           _buildRuleItem(Icons.check_circle_outline, 'Identity verification required.'),
           const SizedBox(height: 40),
@@ -416,10 +598,10 @@ class _PoolPreviewSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('You are about to join "Community Savings".'),
+            Text('You are about to join "${pool['name']}".'),
             const SizedBox(height: 16),
-            _buildSummaryRow('Monthly Payment', '\$100'),
-            _buildSummaryRow('Duration', '10 Months'),
+            _buildSummaryRow('Monthly Payment', '₹${pool['contribution_amount']}'),
+            _buildSummaryRow('Duration', '${pool['total_rounds']} Cycles'),
             _buildSummaryRow('First Payment', 'Due Now'),
             const SizedBox(height: 24),
             const Text('By confirming, you agree to the pool rules and commit to timely payments.', style: TextStyle(fontSize: 12, color: Colors.grey)),
@@ -431,13 +613,31 @@ class _PoolPreviewSheet extends StatelessWidget {
             onPressed: () {
               context.pop(); // Close dialog
               context.pop(); // Close sheet
-              context.push('/payment', extra: {'poolId': 'new', 'amount': 100.0});
+              _joinPool(context);
             },
             child: const Text('Confirm & Pay'),
           ),
         ],
       ),
     );
+  }
+
+  void _joinPool(BuildContext context) async {
+    try {
+      await PoolService.joinPool(pool['id']);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Successfully joined pool!')),
+        );
+        context.go('/pool-details/${pool['id']}');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error joining pool: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Widget _buildSectionTitle(BuildContext context, String title) {

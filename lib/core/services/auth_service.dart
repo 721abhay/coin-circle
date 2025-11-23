@@ -98,4 +98,47 @@ class AuthService {
       await _client.rpc('delete_user_account');
     }
   }
+  /// Update user profile
+  /// Update user profile
+  Future<void> updateProfile({
+    required String fullName,
+    required String phoneNumber,
+    String? bio,
+    String? avatarUrl,
+  }) async {
+    final user = currentUser;
+    if (user != null) {
+      final updates = {
+        'full_name': fullName,
+        'phone_number': phoneNumber,
+        'updated_at': DateTime.now().toIso8601String(),
+        if (avatarUrl != null) 'avatar_url': avatarUrl,
+      };
+
+      try {
+        // Try to update with bio first
+        if (bio != null) {
+          updates['bio'] = bio;
+        }
+        await _client.from('profiles').update(updates).eq('id', user.id);
+      } catch (e) {
+        // If bio column doesn't exist, try updating without bio
+        if (e.toString().contains('bio')) {
+          updates.remove('bio');
+          await _client.from('profiles').update(updates).eq('id', user.id);
+          
+          // Save bio to metadata as fallback
+          await updateUserMetadata({'bio': bio});
+        } else {
+          rethrow;
+        }
+      }
+      
+      // Also update auth metadata for consistency
+      await updateUserMetadata({
+        'full_name': fullName,
+        if (bio != null) 'bio': bio,
+      });
+    }
+  }
 }

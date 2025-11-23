@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/services/pool_service.dart';
 
 class CreatePoolScreen extends ConsumerStatefulWidget {
   const CreatePoolScreen({super.key});
@@ -70,23 +71,57 @@ class _CreatePoolScreenState extends ConsumerState<CreatePoolScreen> {
     }
   }
 
-  void _publishPool() {
+  void _publishPool() async {
+    final state = ref.read(createPoolProvider);
+    
+    // Show loading dialog
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Pool Published!'),
-        content: const Text('Your pool has been successfully created. Share the invite code with your friends.'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              context.pop(); // Close dialog
-              context.go('/home'); // Go to home
-            },
-            child: const Text('Done'),
-          ),
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
+
+    try {
+      await PoolService.createPool(
+        name: state.name,
+        description: state.description,
+        contributionAmount: state.amount,
+        frequency: state.frequency.toLowerCase(),
+        maxMembers: state.maxMembers,
+        durationMonths: state.duration,
+        startDate: DateTime.now().add(const Duration(days: 1)),
+        privacy: state.isPrivate ? 'private' : 'public',
+        type: 'standard', // Default type
+      );
+
+      if (mounted) {
+        Navigator.pop(context); // Pop loading
+        
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Pool Published!'),
+            content: const Text('Your pool has been successfully created. Share the invite code with your friends.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  context.pop(); // Close dialog
+                  context.go('/my-pools'); // Go to My Pools to see the new pool
+                },
+                child: const Text('View My Pools'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Pop loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error creating pool: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 }
 
@@ -179,7 +214,7 @@ class _FinancialDetailsStep extends ConsumerWidget {
             spacing: 8,
             children: [50, 100, 200, 500].map((amount) {
               return ChoiceChip(
-                label: Text('\$$amount'),
+                label: Text('₹$amount'),
                 selected: state.amount == amount,
                 onSelected: (selected) {
                   if (selected) ref.read(createPoolProvider.notifier).updateAmount(amount.toDouble());
@@ -191,7 +226,7 @@ class _FinancialDetailsStep extends ConsumerWidget {
           TextFormField(
             initialValue: state.amount.toString(),
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Custom Amount', prefixText: '\$ '),
+            decoration: const InputDecoration(labelText: 'Custom Amount', prefixText: '₹'),
             onChanged: (value) {
               if (value.isNotEmpty) ref.read(createPoolProvider.notifier).updateAmount(double.tryParse(value) ?? 0);
             },
@@ -225,7 +260,7 @@ class _FinancialDetailsStep extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Total Pool Value:', style: TextStyle(fontWeight: FontWeight.bold)),
-                Text('\$${NumberFormat('#,###').format(totalAmount)}', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor, fontSize: 18)),
+                Text('₹${NumberFormat('#,###').format(totalAmount)}', style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).primaryColor, fontSize: 18)),
               ],
             ),
           ),
@@ -286,7 +321,7 @@ class _PoolRulesStep extends ConsumerWidget {
                 child: TextFormField(
                   initialValue: state.lateFee.toString(),
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Late Fee (\$)'),
+                  decoration: const InputDecoration(labelText: 'Late Fee (₹)'),
                   onChanged: (value) => ref.read(createPoolProvider.notifier).updateLateFee(double.tryParse(value) ?? 5.0),
                 ),
               ),
@@ -399,14 +434,14 @@ class _ReviewStep extends ConsumerWidget {
           _buildSummaryRow('Category', state.category),
           const Divider(),
           _buildSectionHeader(context, 'Financials'),
-          _buildSummaryRow('Amount', '\$${state.amount}'),
+          _buildSummaryRow('Amount', '₹${state.amount}'),
           _buildSummaryRow('Frequency', state.frequency),
           _buildSummaryRow('Duration', '${state.duration} cycles'),
           const Divider(),
           _buildSectionHeader(context, 'Rules'),
           _buildSummaryRow('Members', '${state.maxMembers}'),
           _buildSummaryRow('Winner Selection', state.winnerSelectionMethod),
-          _buildSummaryRow('Late Fee', '\$${state.lateFee} after ${state.lateGracePeriod} days'),
+          _buildSummaryRow('Late Fee', '₹${state.lateFee} after ${state.lateGracePeriod} days'),
           const SizedBox(height: 32),
           Row(
             children: [

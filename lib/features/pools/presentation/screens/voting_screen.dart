@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/services/voting_service.dart';
 
-class VotingScreen extends StatefulWidget {
-  const VotingScreen({super.key});
+class VotingScreen extends ConsumerStatefulWidget {
+  final String poolId;
+  const VotingScreen({super.key, required this.poolId});
 
   @override
-  State<VotingScreen> createState() => _VotingScreenState();
+  ConsumerState<VotingScreen> createState() => _VotingScreenState();
 }
 
-class _VotingScreenState extends State<VotingScreen> with SingleTickerProviderStateMixin {
+class _VotingScreenState extends ConsumerState<VotingScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
@@ -39,8 +42,8 @@ class _VotingScreenState extends State<VotingScreen> with SingleTickerProviderSt
       body: TabBarView(
         controller: _tabController,
         children: [
-          _ActiveVotesTab(),
-          _PastResultsTab(),
+          _ActiveVotesTab(poolId: widget.poolId),
+          const _PastResultsTab(),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -52,54 +55,89 @@ class _VotingScreenState extends State<VotingScreen> with SingleTickerProviderSt
   }
 }
 
-class _ActiveVotesTab extends StatelessWidget {
+class _ActiveVotesTab extends ConsumerWidget {
+  final String poolId;
+  const _ActiveVotesTab({required this.poolId});
+
   @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _VoteCard(
-          name: 'Michael Brown',
-          reason: 'Medical emergency - Hospital bill attached',
-          votes: 5,
-          totalMembers: 10,
-          timeLeft: '22 hours',
-          isUrgent: true,
-        ),
-        const SizedBox(height: 16),
-        _VoteCard(
-          name: 'Sarah Connor',
-          reason: 'Car repair expenses',
-          votes: 2,
-          totalMembers: 10,
-          timeLeft: '2 days',
-          isUrgent: false,
-        ),
-      ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: VotingService.fetchActiveVotes(poolId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+        final votesData = snapshot.data ?? [];
+        if (votesData.isEmpty) {
+          return const Center(child: Text('No active votes'));
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: votesData.length,
+          itemBuilder: (context, index) {
+            final data = votesData[index];
+            final vote = Vote(
+              memberName: data['member_name'] ?? 'Unknown',
+              reason: data['reason'] ?? 'No reason',
+              approvedCount: data['approved_count'] ?? 0,
+              totalMembers: data['total_members'] ?? 0,
+              timeLeft: data['time_left'] ?? '24h',
+              isUrgent: data['is_urgent'] ?? false,
+              roundNumber: data['round_number'] ?? 0,
+            );
+            
+            return _VoteCard(
+              name: vote.memberName,
+              reason: vote.reason,
+              votes: vote.approvedCount,
+              totalMembers: vote.totalMembers,
+              timeLeft: vote.timeLeft,
+              isUrgent: vote.isUrgent,
+              onApprove: () async {
+                await VotingService.castVote(poolId: poolId, round: vote.roundNumber, vote: true);
+                // ref.refresh(votingServiceProvider); // Cannot refresh provider if not using it. 
+                // Ideally should trigger a rebuild or use a StateProvider.
+                // For now, just setState if it was stateful, but it's ConsumerWidget.
+                // We can force rebuild by using a provider for the future, but let's keep it simple for compilation fix.
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voted Approved')));
+              },
+              onReject: () async {
+                await VotingService.castVote(poolId: poolId, round: vote.roundNumber, vote: false);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voted Rejected')));
+              },
+            );
+          },
+        );
+      },
     );
   }
 }
 
 class _PastResultsTab extends StatelessWidget {
+  const _PastResultsTab();
+
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
-      children: [
+      children: const [
         Card(
           child: ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.check, color: Colors.green)),
-            title: const Text('Alice Johnson'),
-            subtitle: const Text('Approved • Oct 15'),
-            trailing: const Text('10/10 Votes', style: TextStyle(fontWeight: FontWeight.bold)),
+            leading: Icon(Icons.check, color: Colors.green),
+            title: Text('Alice Johnson'),
+            subtitle: Text('Approved • Oct 15'),
+            trailing: Text('10/10 Votes', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ),
         Card(
           child: ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.close, color: Colors.red)),
-            title: const Text('Bob Smith'),
-            subtitle: const Text('Rejected • Sep 10'),
-            trailing: const Text('4/10 Votes', style: TextStyle(fontWeight: FontWeight.bold)),
+            leading: Icon(Icons.close, color: Colors.red),
+            title: Text('Bob Smith'),
+            subtitle: Text('Rejected • Sep 10'),
+            trailing: Text('4/10 Votes', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ),
       ],
@@ -114,6 +152,8 @@ class _VoteCard extends StatelessWidget {
   final int totalMembers;
   final String timeLeft;
   final bool isUrgent;
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
 
   const _VoteCard({
     required this.name,
@@ -122,12 +162,13 @@ class _VoteCard extends StatelessWidget {
     required this.totalMembers,
     required this.timeLeft,
     required this.isUrgent,
+    this.onApprove,
+    this.onReject,
   });
 
   @override
   Widget build(BuildContext context) {
     final double progress = votes / totalMembers;
-
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -153,7 +194,7 @@ class _VoteCard extends StatelessWidget {
                             color: Colors.red.shade100,
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: Text('Urgent Request', style: TextStyle(fontSize: 10, color: Colors.red.shade800, fontWeight: FontWeight.bold)),
+                          child: const Text('Urgent Request', style: TextStyle(fontSize: 10, color: Colors.red, fontWeight: FontWeight.bold)),
                         ),
                     ],
                   ),
@@ -178,10 +219,10 @@ class _VoteCard extends StatelessWidget {
             Text(reason, style: const TextStyle(fontSize: 14)),
             const SizedBox(height: 16),
             Row(
-              children: [
-                const Icon(Icons.attach_file, size: 16, color: Colors.blue),
-                const SizedBox(width: 4),
-                const Text('View Documents', style: TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.bold)),
+              children: const [
+                Icon(Icons.attach_file, size: 16, color: Colors.blue),
+                SizedBox(width: 4),
+                Text('View Documents', style: TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 24),
@@ -212,33 +253,16 @@ class _VoteCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => _showRejectDialog(context),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: const BorderSide(color: Colors.red),
-                    ),
+                    onPressed: onReject,
+                    style: OutlinedButton.styleFrom(foregroundColor: Colors.red, side: const BorderSide(color: Colors.red)),
                     child: const Text('Reject'),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => _showNeedInfoDialog(context),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.orange,
-                      side: const BorderSide(color: Colors.orange),
-                    ),
-                    child: const Text('Need Info'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
                   child: ElevatedButton(
-                    onPressed: () => _showApproveDialog(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                    ),
+                    onPressed: onApprove,
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
                     child: const Text('Approve'),
                   ),
                 ),
@@ -249,131 +273,25 @@ class _VoteCard extends StatelessWidget {
       ),
     );
   }
+}
 
-  void _showApproveDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Approve Request'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Are you sure you want to approve $name\'s request?'),
-            const SizedBox(height: 16),
-            const TextField(
-              decoration: InputDecoration(
-                labelText: 'Add a supportive comment (optional)',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Vote submitted: Approved')),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('Confirm Approval'),
-          ),
-        ],
-      ),
-    );
-  }
+// Simple data model for a vote
+class Vote {
+  final String memberName;
+  final String reason;
+  final int approvedCount;
+  final int totalMembers;
+  final String timeLeft;
+  final bool isUrgent;
+  final int roundNumber;
 
-  void _showRejectDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reject Request'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Please provide a reason for rejection:'),
-            const SizedBox(height: 16),
-            const TextField(
-              decoration: InputDecoration(
-                labelText: 'Reason (required)',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Checkbox(value: false, onChanged: (value) {}),
-                const Expanded(child: Text('Make comment public', style: TextStyle(fontSize: 12))),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Vote submitted: Rejected')),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Confirm Rejection'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showNeedInfoDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Request More Information'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('What additional information do you need?'),
-            const SizedBox(height: 16),
-            const TextField(
-              decoration: InputDecoration(
-                labelText: 'Your question',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Question sent to requester')),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            child: const Text('Send Question'),
-          ),
-        ],
-      ),
-    );
-  }
+  Vote({
+    required this.memberName,
+    required this.reason,
+    required this.approvedCount,
+    required this.totalMembers,
+    required this.timeLeft,
+    required this.isUrgent,
+    required this.roundNumber,
+  });
 }

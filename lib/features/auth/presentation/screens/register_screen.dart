@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -15,12 +17,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  bool _isLoading = false;
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
   bool _acceptedTerms = false;
+  final _authService = AuthService();
+  
+  // Password strength tracking
+  double _passwordStrength = 0.0;
+  bool _hasMinLength = false;
+  bool _hasUppercase = false;
+  bool _hasLowercase = false;
+  bool _hasDigit = false;
+  bool _hasSpecialChar = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordController.addListener(_checkPasswordStrength);
+  }
 
   @override
   void dispose() {
+    _passwordController.removeListener(_checkPasswordStrength);
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
@@ -29,7 +48,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _handleRegister() {
+  void _checkPasswordStrength() {
+    final password = _passwordController.text;
+    setState(() {
+      _hasMinLength = password.length >= 8;
+      _hasUppercase = password.contains(RegExp(r'[A-Z]'));
+      _hasLowercase = password.contains(RegExp(r'[a-z]'));
+      _hasDigit = password.contains(RegExp(r'[0-9]'));
+      _hasSpecialChar = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
+      
+      int strength = 0;
+      if (_hasMinLength) strength++;
+      if (_hasUppercase) strength++;
+      if (_hasLowercase) strength++;
+      if (_hasDigit) strength++;
+      if (_hasSpecialChar) strength++;
+      
+      _passwordStrength = strength / 5.0;
+    });
+  }
+
+  Future<void> _handleRegister() async {
     if (_formKey.currentState!.validate()) {
       if (!_acceptedTerms) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -37,8 +76,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
         );
         return;
       }
-      // TODO: Implement actual registration logic
-      context.push('/verify-email');
+
+      setState(() => _isLoading = true);
+
+      try {
+        await _authService.signUp(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          userData: {
+            'full_name': _nameController.text.trim(),
+          },
+        );
+
+        if (mounted) {
+          context.push('/verify-email');
+        }
+      } on AuthException catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.message),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Registration failed: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
     }
   }
 
@@ -145,6 +220,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                 ),
                 const SizedBox(height: 8),
+                // Password Strength Indicator
+                if (_passwordController.text.isNotEmpty) ...[
+                  LinearProgressIndicator(
+                    value: _passwordStrength,
+                    backgroundColor: Colors.grey.shade300,
+                    color: _passwordStrength < 0.4 ? Colors.red : _passwordStrength < 0.7 ? Colors.orange : Colors.green,
+                    minHeight: 4,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _passwordStrength < 0.4 ? 'Weak' : _passwordStrength < 0.7 ? 'Medium' : 'Strong',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _passwordStrength < 0.4 ? Colors.red : _passwordStrength < 0.7 ? Colors.orange : Colors.green,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Requirements Checklist
+                  _buildRequirement('At least 8 characters', _hasMinLength),
+                  _buildRequirement('1 uppercase letter', _hasUppercase),
+                  _buildRequirement('1 lowercase letter', _hasLowercase),
+                  _buildRequirement('1 number', _hasDigit),
+                  _buildRequirement('1 special character', _hasSpecialChar),
+                ],
+                const SizedBox(height: 8),
                 // Password strength indicators could go here
                 const SizedBox(height: 16),
                 TextFormField(
@@ -238,6 +338,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildRequirement(String text, bool isMet) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Icon(
+            isMet ? Icons.check_circle : Icons.circle_outlined,
+            size: 16,
+            color: isMet ? Colors.green : Colors.grey,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              color: isMet ? Colors.green : Colors.grey,
+            ),
+          ),
+        ],
       ),
     );
   }

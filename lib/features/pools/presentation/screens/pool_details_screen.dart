@@ -1,24 +1,49 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/services/pool_service.dart';
 
-class PoolDetailsScreen extends StatefulWidget {
+class PoolDetailsScreen extends ConsumerStatefulWidget {
   final String poolId;
 
   const PoolDetailsScreen({super.key, required this.poolId});
 
   @override
-  State<PoolDetailsScreen> createState() => _PoolDetailsScreenState();
+  ConsumerState<PoolDetailsScreen> createState() => _PoolDetailsScreenState();
 }
 
-class _PoolDetailsScreenState extends State<PoolDetailsScreen> with SingleTickerProviderStateMixin {
+class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  Map<String, dynamic>? _pool;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this); // Increased to 5
+    _tabController = TabController(length: 7, vsync: this);
+    _loadPoolDetails();
+  }
+
+  Future<void> _loadPoolDetails() async {
+    try {
+      final pool = await PoolService.getPoolDetails(widget.poolId);
+      if (mounted) {
+        setState(() {
+          _pool = pool;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading pool: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -38,14 +63,20 @@ class _PoolDetailsScreenState extends State<PoolDetailsScreen> with SingleTicker
               floating: false,
               pinned: true,
               flexibleSpace: FlexibleSpaceBar(
-                title: const Text('Office Savings Circle', style: TextStyle(color: Colors.white)),
+                title: Text(_pool?['name'] ?? 'Loading...', style: const TextStyle(color: Colors.white)),
                 background: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Image.network(
-                      'https://picsum.photos/seed/pool/800/400',
-                      fit: BoxFit.cover,
-                    ),
+                    if (_pool?['image_url'] != null)
+                      Image.network(
+                        _pool!['image_url'],
+                        fit: BoxFit.cover,
+                      )
+                    else
+                      Image.network(
+                        'https://picsum.photos/seed/${widget.poolId}/800/400',
+                        fit: BoxFit.cover,
+                      ),
                     Container(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -61,19 +92,26 @@ class _PoolDetailsScreenState extends State<PoolDetailsScreen> with SingleTicker
               actions: [
                 IconButton(icon: const Icon(Icons.share), onPressed: () {}),
                 PopupMenuButton(
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'edit', child: Text('Edit Pool')),
-                    const PopupMenuItem(value: 'mute', child: Text('Mute Notifications')),
-                    const PopupMenuItem(value: 'leave', child: Text('Leave Pool')),
-                    const PopupMenuItem(value: 'report', child: Text('Report Issue')),
-                    const PopupMenuItem(value: 'demo_draw', child: Text('Simulate Draw (Demo)')),
-                    const PopupMenuItem(value: 'demo_vote', child: Text('View Vote Request (Demo)')),
-                  ],
+                  itemBuilder: (context) {
+                    final isCreator = _pool?['creator_id'] == Supabase.instance.client.auth.currentUser?.id;
+                    return [
+                      if (isCreator)
+                        const PopupMenuItem(value: 'manage', child: Text('Manage Pool (Admin)')),
+                      const PopupMenuItem(value: 'edit', child: Text('Edit Pool')),
+                      const PopupMenuItem(value: 'mute', child: Text('Mute Notifications')),
+                      const PopupMenuItem(value: 'leave', child: Text('Leave Pool')),
+                      const PopupMenuItem(value: 'report', child: Text('Report Issue')),
+                      const PopupMenuItem(value: 'demo_draw', child: Text('Simulate Draw (Demo)')),
+                      const PopupMenuItem(value: 'demo_vote', child: Text('View Vote Request (Demo)')),
+                    ];
+                  },
                   onSelected: (value) {
-                    if (value == 'demo_draw') {
-                      context.push('/winner-selection');
+                    if (value == 'manage') {
+                      context.push('/creator-dashboard/${widget.poolId}');
+                    } else if (value == 'demo_draw') {
+                      context.push('/winner-selection/${widget.poolId}');
                     } else if (value == 'demo_vote') {
-                      context.push('/voting');
+                      context.push('/voting/${widget.poolId}');
                     }
                   },
                 ),
@@ -84,9 +122,11 @@ class _PoolDetailsScreenState extends State<PoolDetailsScreen> with SingleTicker
                 isScrollable: true,
                 tabs: const [
                   Tab(text: 'Overview'),
-                  Tab(text: 'Rules'), // New Tab
+                  Tab(text: 'Members'),
+                  Tab(text: 'Schedule'),
+                  Tab(text: 'Winners'),
                   Tab(text: 'Chat'),
-                  Tab(text: 'Files'),
+                  Tab(text: 'Docs'),
                   Tab(text: 'Stats'),
                 ],
               ),
@@ -96,11 +136,13 @@ class _PoolDetailsScreenState extends State<PoolDetailsScreen> with SingleTicker
         body: TabBarView(
           controller: _tabController,
           children: [
-            _OverviewTab(poolId: widget.poolId),
-            _RulesTab(), // New Tab View
-            _ChatTab(),
-            _FilesTab(),
-            _StatsTab(),
+            _OverviewTab(pool: _pool),
+            _MembersTab(poolId: widget.poolId),
+            _ScheduleTab(poolId: widget.poolId),
+            _WinnersTab(poolId: widget.poolId),
+            _ChatTab(poolId: widget.poolId),
+            _DocsTab(poolId: widget.poolId),
+            _StatsTab(poolId: widget.poolId),
           ],
         ),
       ),
@@ -109,12 +151,15 @@ class _PoolDetailsScreenState extends State<PoolDetailsScreen> with SingleTicker
 }
 
 class _OverviewTab extends StatelessWidget {
-  final String poolId;
+  final Map<String, dynamic>? pool;
 
-  const _OverviewTab({required this.poolId});
+  const _OverviewTab({this.pool});
 
   @override
   Widget build(BuildContext context) {
+    if (pool == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -158,7 +203,10 @@ class _OverviewTab extends StatelessWidget {
                 children: [
                   Text('Pool Balance', style: TextStyle(color: Colors.white.withOpacity(0.8))),
                   const SizedBox(height: 4),
-                  const Text('\$2,500', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                  Text(
+                    NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(pool!['total_amount'] ?? 0),
+                    style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+                  ),
                 ],
               ),
               Container(
@@ -167,7 +215,10 @@ class _OverviewTab extends StatelessWidget {
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text('Cycle 3 of 10', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                child: Text(
+                  'Cycle 1 of ${pool!['total_rounds'] ?? 10}', // TODO: Calculate current cycle
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
@@ -175,9 +226,12 @@ class _OverviewTab extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildStatusItem('Next Draw', '2 Days'),
-              _buildStatusItem('Your Contribution', '\$1,500'),
-              _buildStatusItem('Time Left', '3M 15D'), // Updated format
+              _buildStatusItem('Next Draw', '2 Days'), // TODO: Calculate
+              _buildStatusItem(
+                'Your Contribution',
+                NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(pool!['contribution_amount'] ?? 0),
+              ),
+              _buildStatusItem('Time Left', '3M 15D'), // TODO: Calculate
             ],
           ),
           const SizedBox(height: 16),
@@ -241,18 +295,21 @@ class _OverviewTab extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Amount Due:', style: TextStyle(color: Colors.grey)),
-              Text('\$500.00', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              Text(
+                NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(pool!['contribution_amount'] ?? 0),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
             ],
           ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () => context.push('/payment', extra: {'poolId': poolId, 'amount': 500.0}),
+              onPressed: () => context.push('/payment', extra: {'poolId': pool!['id'], 'amount': (pool!['contribution_amount'] as num).toDouble()}),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
               child: const Text('Pay Now'),
             ),
@@ -269,7 +326,10 @@ class _OverviewTab extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Members (8/10)', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)), // Updated Capacity
+            Text(
+              'Members (${pool!['current_members']}/${pool!['max_members']})',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
             TextButton(onPressed: () {}, child: const Text('View All')),
           ],
         ),
@@ -348,31 +408,22 @@ class _OverviewTab extends StatelessWidget {
   }
 
   Widget _buildScheduleItem(BuildContext context, int cycle, String date, String status, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border(left: BorderSide(color: color, width: 4)),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 5)],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Cycle $cycle', style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text(date, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-            ],
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: color.withOpacity(0.1),
+          child: Text('C$cycle', style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+        ),
+        title: Text(date),
+        trailing: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-            child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
-          ),
-        ],
+          child: Text(status, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
+        ),
       ),
     );
   }
@@ -411,8 +462,8 @@ class _OverviewTab extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        _buildWinnerItem('Cycle 2', 'Sarah Smith', 'Nov 15', '\$2,500'),
-        _buildWinnerItem('Cycle 1', 'Mike Johnson', 'Oct 15', '\$2,500'),
+        _buildWinnerItem('Cycle 2', 'Sarah Smith', 'Nov 15', '₹2,500'),
+        _buildWinnerItem('Cycle 1', 'Mike Johnson', 'Oct 15', '₹2,500'),
       ],
     );
   }
@@ -431,8 +482,14 @@ class _OverviewTab extends StatelessWidget {
 }
 
 class _RulesTab extends StatelessWidget {
+  final Map<String, dynamic>? pool;
+
+  const _RulesTab({this.pool});
+
   @override
   Widget build(BuildContext context) {
+    if (pool == null) return const Center(child: CircularProgressIndicator());
+    
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -441,9 +498,9 @@ class _RulesTab extends StatelessWidget {
           'Time Limits',
           Icons.timer,
           [
-            _buildRuleRow('Duration', '10 Cycles (10 Months)'),
-            _buildRuleRow('Frequency', 'Monthly'),
-            _buildRuleRow('End Date', 'July 15, 2026'),
+            _buildRuleRow('Duration', '${pool!['total_rounds']} Cycles (${pool!['total_rounds']} Months)'),
+            _buildRuleRow('Frequency', pool!['frequency'].toString().toUpperCase()),
+            _buildRuleRow('End Date', DateFormat('MMM d, yyyy').format(DateTime.parse(pool!['start_date']).add(Duration(days: 30 * (pool!['total_rounds'] as int))))),
             _buildRuleRow('Extension', 'Requires 100% Vote'),
           ],
         ),
@@ -453,8 +510,8 @@ class _RulesTab extends StatelessWidget {
           'Contributions',
           Icons.attach_money,
           [
-            _buildRuleRow('Fixed Amount', '\$500.00 per cycle'),
-            _buildRuleRow('Late Fee', '\$5.00 after 3 days'),
+            _buildRuleRow('Fixed Amount', '${NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(pool!['contribution_amount'])} per cycle'),
+            _buildRuleRow('Late Fee', '₹5.00 after 3 days'),
             _buildRuleRow('Prorated', 'Not allowed for mid-cycle'),
           ],
         ),
@@ -464,8 +521,8 @@ class _RulesTab extends StatelessWidget {
           'Membership',
           Icons.group,
           [
-            _buildRuleRow('Max Members', '10 Members'),
-            _buildRuleRow('Start Condition', 'When full (10/10)'),
+            _buildRuleRow('Max Members', '${pool!['max_members']} Members'),
+            _buildRuleRow('Start Condition', 'When full (${pool!['max_members']}/${pool!['max_members']})'),
             _buildRuleRow('Mid-pool Join', 'Allowed (Next cycle start)'),
           ],
         ),
@@ -510,77 +567,39 @@ class _RulesTab extends StatelessWidget {
   }
 }
 
-class _ChatTab extends StatelessWidget {
+// _StatsTab moved to end of file
+
+// Members Tab - Grid view of pool members
+class _MembersTab extends StatelessWidget {
+  final String poolId;
+  const _MembersTab({required this.poolId});
+
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return ListView(
+      padding: const EdgeInsets.all(16),
       children: [
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: 10,
-            itemBuilder: (context, index) {
-              final isMe = index % 2 == 0;
-              return Align(
-                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isMe ? Theme.of(context).primaryColor : Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(16).copyWith(
-                      bottomRight: isMe ? const Radius.circular(0) : null,
-                      bottomLeft: !isMe ? const Radius.circular(0) : null,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (!isMe) ...[
-                        const Text('John Doe', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.grey)),
-                        const SizedBox(height: 4),
-                      ],
-                      Text(
-                        'Hey everyone! Just made my payment for this month.',
-                        style: TextStyle(color: isMe ? Colors.white : Colors.black87),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '10:30 AM',
-                        style: TextStyle(fontSize: 10, color: isMe ? Colors.white70 : Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+        Text('Members', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 16),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
           ),
-        ),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.1), blurRadius: 5, offset: const Offset(0, -2))],
-          ),
-          child: Row(
+          itemCount: 6,
+          itemBuilder: (context, i) => Column(
             children: [
-              IconButton(icon: const Icon(Icons.attach_file), onPressed: () {}),
-              Expanded(
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Type a message...',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
               CircleAvatar(
-                backgroundColor: Theme.of(context).primaryColor,
-                child: IconButton(icon: const Icon(Icons.send, color: Colors.white), onPressed: () {}),
+                radius: 30,
+                backgroundColor: Colors.primaries[i % Colors.primaries.length],
+                child: Text('M${i + 1}', style: const TextStyle(color: Colors.white)),
               ),
+              const SizedBox(height: 4),
+              Text('Member ${i + 1}', style: const TextStyle(fontSize: 12)),
+              Icon(Icons.check_circle, size: 16, color: i < 3 ? Colors.green : Colors.grey),
             ],
           ),
         ),
@@ -589,100 +608,119 @@ class _ChatTab extends StatelessWidget {
   }
 }
 
-class _FilesTab extends StatelessWidget {
+// Schedule Tab - Contribution calendar
+class _ScheduleTab extends StatelessWidget {
+  final String poolId;
+  const _ScheduleTab({required this.poolId});
+
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _buildFileItem(Icons.description, 'Pool Rules.pdf', '2.5 MB'),
-        _buildFileItem(Icons.article, 'Member Agreement.docx', '1.2 MB'),
-        _buildFileItem(Icons.receipt, 'Cycle 1 Receipt.pdf', '500 KB'),
-        _buildFileItem(Icons.receipt, 'Cycle 2 Receipt.pdf', '500 KB'),
+        Text('Contribution Schedule', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 16),
+        ...List.generate(5, (i) => Card(
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: i == 0 ? Colors.green : Colors.grey.shade300,
+              child: Text('${i + 1}', style: TextStyle(color: i == 0 ? Colors.white : Colors.black)),
+            ),
+            title: Text('Cycle ${i + 1}'),
+            subtitle: Text('Due: ${DateFormat('MMM d, yyyy').format(DateTime.now().add(Duration(days: i * 30)))}'),
+            trailing: Chip(
+              label: Text(i == 0 ? 'Paid' : i == 1 ? 'Upcoming' : 'Pending'),
+              backgroundColor: i == 0 ? Colors.green.shade50 : Colors.grey.shade200,
+            ),
+          ),
+        )),
       ],
     );
   }
+}
 
-  Widget _buildFileItem(IconData icon, String name, String size) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(8)),
-          child: Icon(icon, color: Colors.blue),
+// Winners Tab - Winner history list
+class _WinnersTab extends StatelessWidget {
+  final String poolId;
+  const _WinnersTab({required this.poolId});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text('Winner History', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 16),
+        ...List.generate(3, (i) => Card(
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Colors.amber,
+              child: Icon(Icons.emoji_events, color: Colors.white),
+            ),
+            title: Text('Cycle ${i + 1} Winner'),
+            subtitle: Text('Member ${i + 1} • ₹5,000'),
+            trailing: Text(
+              DateFormat('MMM d').format(DateTime.now().subtract(Duration(days: (3 - i) * 30))),
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+        )),
+        const SizedBox(height: 16),
+        Text('Current Cycle', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        Card(
+          color: Colors.blue.shade50,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Text('Draw in 15 days', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text('Your chances: 1 in 6 (17%)', style: TextStyle(color: Colors.grey)),
+              ],
+            ),
+          ),
         ),
-        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(size),
-        trailing: IconButton(icon: const Icon(Icons.download), onPressed: () {}),
-      ),
+      ],
+    );
+  }
+}
+
+class _ChatTab extends StatelessWidget {
+  final String poolId;
+  
+  const _ChatTab({required this.poolId});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text('Chat functionality coming soon'),
+    );
+  }
+}
+
+class _DocsTab extends StatelessWidget {
+  final String poolId;
+  
+  const _DocsTab({required this.poolId});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text('Documents functionality coming soon'),
     );
   }
 }
 
 class _StatsTab extends StatelessWidget {
+  final String poolId;
+  
+  const _StatsTab({required this.poolId});
+
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          _buildStatCard(context, 'On-time Payment Rate', '95%', Colors.green),
-          const SizedBox(height: 16),
-          _buildStatCard(context, 'Pool Completion', '30%', Colors.blue),
-          const SizedBox(height: 24),
-          const Text('Contribution Trends', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 200,
-            child: BarChart(
-              BarChartData(
-                gridData: FlGridData(show: false),
-                titlesData: FlTitlesData(
-                  leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        return Text('C${value.toInt() + 1}');
-                      },
-                    ),
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                barGroups: List.generate(
-                  5,
-                  (index) => BarChartGroupData(
-                    x: index,
-                    barRods: [
-                      BarChartRodData(toY: (index + 1) * 1000.0, color: Theme.of(context).primaryColor, width: 16),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCard(BuildContext context, String title, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.05), blurRadius: 10)],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(title, style: const TextStyle(fontSize: 16)),
-          Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
-        ],
-      ),
+    return const Center(
+      child: Text('Statistics functionality coming soon'),
     );
   }
 }
-

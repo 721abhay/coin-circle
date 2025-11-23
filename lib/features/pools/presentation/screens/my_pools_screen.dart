@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/services/pool_service.dart';
 
 class MyPoolsScreen extends StatefulWidget {
   const MyPoolsScreen({super.key});
@@ -112,30 +115,153 @@ class _MyPoolsScreenState extends State<MyPoolsScreen> with SingleTickerProvider
   }
 }
 
-class _PoolList extends StatelessWidget {
+class _PoolList extends StatefulWidget {
   final String status;
 
   const _PoolList({required this.status});
 
   @override
-  Widget build(BuildContext context) {
-    // Mock data based on status
-    final pools = List.generate(3, (index) => index);
+  State<_PoolList> createState() => _PoolListState();
+}
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: pools.length,
-      itemBuilder: (context, index) {
-        return _ActivePoolCard(
-          name: '$status Pool ${index + 1}',
-          status: index == 0 ? 'Paid' : (index == 1 ? 'Pending' : 'Overdue'),
-          nextDraw: 'Oct ${24 + index}',
-          amount: (index + 1) * 100,
-          cycle: '${index + 1} of 10',
-          progress: (index + 1) / 10,
-          onTap: () => context.push('/pool-details/${index + 1}'),
+class _PoolListState extends State<_PoolList> {
+  List<Map<String, dynamic>> _pools = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPools();
+  }
+
+  Future<void> _loadPools() async {
+    setState(() => _isLoading = true);
+    try {
+      final pools = await PoolService.getUserPools();
+      print('📊 Loaded ${pools.length} pools from backend'); // Debug log
+      
+      if (mounted) {
+        setState(() {
+          _pools = pools.where((pool) {
+            // Get pool status safely and normalize
+            final poolStatus = (pool['status'] ?? 'pending').toString().toLowerCase();
+            final targetStatus = widget.status.toLowerCase();
+            
+            print('Checking pool: ${pool['name']} ($poolStatus) vs Target: $targetStatus'); // Debug log
+            
+            // Handle 'drafts' vs 'draft' mismatch
+            if (targetStatus == 'drafts' || targetStatus == 'draft') {
+              return poolStatus == 'draft';
+            }
+            
+            // Handle 'active' vs 'paid' mapping if needed, or direct match
+            return poolStatus == targetStatus;
+          }).toList();
+          
+          print('✅ Filtered to ${_pools.length} pools for tab ${widget.status}'); // Debug log
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('❌ Error loading pools: $e'); // Debug log
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading pools: $e')),
         );
-      },
+      }
+    }
+  }
+
+  double _calculateProgress(Map<String, dynamic> pool) {
+    final currentRound = pool['current_round'] as int? ?? 1;
+    final totalRounds = pool['total_rounds'] as int? ?? 1;
+    return currentRound / totalRounds;
+  }
+
+  Future<String> _getPaymentStatus(String poolId) async {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return 'Pending';
+
+    final transactions = await Supabase.instance.client
+        .from('transactions')
+        .select()
+        .eq('pool_id', poolId)
+        .eq('user_id', userId)
+        .eq('transaction_type', 'contribution')
+        .gte('created_at', DateTime.now().subtract(const Duration(days: 30)).toIso8601String()) // Check recent contribution
+        .limit(1);
+    
+    if (transactions.isEmpty) return 'Pending';
+    return 'Paid';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_pools.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _loadPools,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.inbox_outlined, size: 64, color: Colors.grey.shade300),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No ${widget.status} pools found',
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Pull down to refresh',
+                    style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadPools,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _pools.length,
+        itemBuilder: (context, index) {
+          final pool = _pools[index];
+          
+          return FutureBuilder<String>(
+            future: _getPaymentStatus(pool['id']),
+            builder: (context, snapshot) {
+              final paymentStatus = snapshot.data ?? 'Pending';
+              final contributionAmount = (pool['contribution_amount'] as num?)?.toInt() ?? 0;
+              final maxMembers = (pool['max_members'] as num?)?.toInt() ?? 1;
+              
+              return _ActivePoolCard(
+                name: pool['name'] ?? 'Unnamed Pool',
+                status: pool['status'] == 'active' ? paymentStatus : (pool['status'] == 'pending' ? 'Pending' : 'Overdue'),
+                nextDraw: pool['start_date'] != null 
+                    ? DateFormat('MMM d').format(DateTime.parse(pool['start_date']).add(const Duration(days: 30)))
+                    : 'TBD',
+                amount: contributionAmount * maxMembers,
+                cycle: '${pool['current_round'] ?? 1} of ${pool['total_rounds'] ?? 12}',
+                progress: _calculateProgress(pool),
+                onTap: () => context.push('/pool-details/${pool['id']}'),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -216,7 +342,7 @@ class _ActivePoolCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _buildInfoItem(Icons.calendar_today, 'Next Draw', nextDraw),
-                  _buildInfoItem(Icons.attach_money, 'Total Pool', '\$${amount * 10}'), // Assuming 10 members
+                  _buildInfoItem(Icons.attach_money, 'Total Pool', '₹${amount * 10}'), // Assuming 10 members
                   _buildInfoItem(Icons.pie_chart, 'Your Odds', '10%'),
                 ],
               ),

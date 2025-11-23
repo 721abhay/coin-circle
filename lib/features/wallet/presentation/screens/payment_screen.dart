@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:animate_do/animate_do.dart';
+import '../../../../core/services/wallet_service.dart';
+import '../../../../core/services/pool_service.dart';
 
 class PaymentScreen extends StatefulWidget {
   final String poolId;
@@ -17,9 +19,58 @@ class _PaymentScreenState extends State<PaymentScreen> {
   int _selectedMethod = 0;
   bool _autoPayEnabled = false;
   bool _isProcessing = false;
+  Map<String, dynamic>? _pool;
+  int _currentRound = 1;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPoolDetails();
+  }
+
+  Future<void> _loadPoolDetails() async {
+    try {
+      final pool = await PoolService.getPoolDetails(widget.poolId);
+      if (mounted) {
+        setState(() {
+          _pool = pool;
+          _calculateCurrentRound();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading pool details: $e')),
+        );
+      }
+    }
+  }
+
+  void _calculateCurrentRound() {
+    if (_pool == null) return;
+    final startDate = DateTime.parse(_pool!['start_date']);
+    final now = DateTime.now();
+    final difference = now.difference(startDate).inDays;
+    // Simple monthly calculation (30 days approx)
+    _currentRound = (difference / 30).floor() + 1;
+    if (_currentRound < 1) _currentRound = 1;
+    // Clamp to total rounds if available
+    if (_pool!['total_rounds'] != null) {
+      if (_currentRound > _pool!['total_rounds']) {
+        _currentRound = _pool!['total_rounds'];
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     final double processingFee = widget.amount * 0.01; // 1% fee
     final double totalAmount = widget.amount + processingFee;
 
@@ -43,7 +94,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 16),
-                    _buildPaymentMethod(0, 'Wallet Balance', 'Available: \$2,450.00', Icons.account_balance_wallet),
+                    _buildPaymentMethod(0, 'Wallet Balance', 'Available: ₹2,450.00', Icons.account_balance_wallet),
                     _buildPaymentMethod(1, 'Bank Account', 'Chase **** 1234', Icons.account_balance),
                     _buildPaymentMethod(2, 'Credit Card', 'Visa **** 5678', Icons.credit_card),
                     const SizedBox(height: 24),
@@ -70,7 +121,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : Text('Pay \$${totalAmount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18)),
+                      : Text('Pay ₹${totalAmount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 18)),
                 ),
               ),
             ),
@@ -93,11 +144,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
           child: Icon(Icons.groups, color: Theme.of(context).primaryColor),
         ),
         const SizedBox(width: 16),
-        const Column(
+        Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Office Savings Circle', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            Text('Cycle 3 of 10', style: TextStyle(color: Colors.grey)),
+            Text(_pool?['name'] ?? 'Pool Name', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text('Cycle $_currentRound of ${_pool?['total_rounds'] ?? 10}', style: const TextStyle(color: Colors.grey)),
           ],
         ),
       ],
@@ -114,7 +165,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '\$${widget.amount.toStringAsFixed(2)}',
+            '₹${widget.amount.toStringAsFixed(2)}',
             style: Theme.of(context).textTheme.displayMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: Theme.of(context).primaryColor,
@@ -219,7 +270,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           ),
         ),
         Text(
-          '\$${value.toStringAsFixed(2)}',
+          '₹${value.toStringAsFixed(2)}',
           style: TextStyle(
             fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
             fontSize: isTotal ? 16 : 14,
@@ -234,7 +285,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirm Payment'),
-        content: Text('Are you sure you want to pay \$${total.toStringAsFixed(2)}?'),
+        content: Text('Are you sure you want to pay ₹${total.toStringAsFixed(2)}?'),
         actions: [
           TextButton(onPressed: () => context.pop(), child: const Text('Cancel')),
           ElevatedButton(
@@ -251,10 +302,30 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   void _processPayment() async {
     setState(() => _isProcessing = true);
-    await Future.delayed(const Duration(seconds: 2)); // Simulate API call
-    if (mounted) {
-      setState(() => _isProcessing = false);
-      _showSuccessScreen();
+    
+    try {
+      // Only support wallet balance for now as per requirement
+      if (_selectedMethod != 0) {
+        throw Exception('Only Wallet Balance payment is currently supported');
+      }
+
+      await WalletService.contributeToPool(
+        poolId: widget.poolId,
+        amount: widget.amount,
+        round: _currentRound,
+      );
+
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        _showSuccessScreen();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Payment failed: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -307,7 +378,7 @@ class PaymentSuccessScreen extends StatelessWidget {
               FadeInUp(
                 delay: const Duration(milliseconds: 200),
                 child: Text(
-                  'You have successfully contributed \$${amount.toStringAsFixed(2)}',
+                  'You have successfully contributed ₹${amount.toStringAsFixed(2)}',
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Colors.grey, fontSize: 16),
                 ),

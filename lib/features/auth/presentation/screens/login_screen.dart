@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,8 +15,28 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _authService = AuthService();
+  bool _obscurePassword = true;
   bool _isPasswordVisible = false;
   bool _rememberMe = false;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedCredentials();
+  }
+
+  Future<void> _loadSavedCredentials() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedEmail = prefs.getString('saved_email');
+    if (savedEmail != null) {
+      _emailController.text = savedEmail;
+      setState(() {
+        _rememberMe = true;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -22,10 +45,50 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _handleLogin() {
+  Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
-      // TODO: Implement actual login logic
-      context.go('/home');
+      setState(() => _isLoading = true);
+
+      try {
+        await _authService.signIn(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+
+        // Save credentials if remember me is checked
+        final prefs = await SharedPreferences.getInstance();
+        if (_rememberMe) {
+          await prefs.setString('saved_email', _emailController.text.trim());
+        } else {
+          await prefs.remove('saved_email');
+        }
+
+        if (mounted) {
+          context.go('/home');
+        }
+      } on AuthException catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.message),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Login failed: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
     }
   }
 

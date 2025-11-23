@@ -1,11 +1,77 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
+import '../../../../core/services/wallet_management_service.dart';
+import '../../../../core/services/pool_service.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  bool _isLoading = true;
+  Map<String, dynamic>? _profile;
+  Map<String, double>? _walletStats;
+  Map<String, int>? _poolStats;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileData();
+  }
+
+  Future<void> _loadProfileData() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        // Fetch profile
+        final profile = await Supabase.instance.client
+            .from('profiles')
+            .select()
+            .eq('id', user.id)
+            .single();
+        
+        // Fetch wallet stats
+        final wallet = await WalletManagementService.getBalanceBreakdown();
+        
+        // Fetch pool stats
+        final pools = await PoolService.getUserPools();
+        final joined = pools.length;
+        final active = pools.where((p) => p['status'] == 'active').length;
+        final completed = pools.where((p) => p['status'] == 'completed').length;
+
+        if (mounted) {
+          setState(() {
+            _profile = profile;
+            _walletStats = wallet;
+            _poolStats = {
+              'joined': joined,
+              'active': active,
+              'completed': completed,
+            };
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        // Handle error silently or show snackbar
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Profile'),
@@ -28,6 +94,10 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 24),
             _buildAccountStats(context),
             const SizedBox(height: 24),
+            _buildAccountStats(context),
+            const SizedBox(height: 24),
+            _buildPerformanceMetrics(context),
+            const SizedBox(height: 24),
             _buildStatsGrid(context),
             const SizedBox(height: 24),
             _buildQuickActions(context),
@@ -39,14 +109,64 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildPerformanceMetrics(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _buildMetricItem('Trust Score', '98/100', Colors.green),
+        _buildMetricItem('On-Time', '100%', Colors.blue),
+        _buildMetricItem('Contributed', '₹1.2L', Colors.orange),
+      ],
+    );
+  }
+
+  Widget _buildMetricItem(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade600,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildProfileHeader(BuildContext context) {
+    final user = Supabase.instance.client.auth.currentUser;
+    final email = user?.email ?? 'No Email';
+    final name = _profile?['full_name'] ?? 'User';
+    final phone = _profile?['phone_number'] ?? 'No Phone';
+    final avatarUrl = _profile?['avatar_url'];
+    final location = _profile?['location'];
+    final bio = _profile?['bio'];
+    final dobString = _profile?['dob'];
+    DateTime? dob;
+    if (dobString != null && dobString is String) {
+      try {
+        dob = DateTime.parse(dobString);
+      } catch (_) {}
+    }
+
     return Column(
       children: [
         Stack(
           children: [
-            const CircleAvatar(
+            CircleAvatar(
               radius: 50,
-              backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=12'),
+              backgroundImage: avatarUrl != null
+                  ? NetworkImage(avatarUrl)
+                  : const NetworkImage('https://i.pravatar.cc/150?img=12'),
             ),
             Positioned(
               bottom: 0,
@@ -62,40 +182,16 @@ class ProfileScreen extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        Text(
-          'Alex Johnson',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'alex.johnson@example.com',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '+1 (555) 123-4567',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey),
-        ),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.green.shade100,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.verified, color: Colors.green, size: 16),
-              const SizedBox(width: 6),
-              Text(
-                'Trust Score: 98%',
-                style: TextStyle(color: Colors.green.shade800, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-        ),
+        Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        Text(email, style: const TextStyle(color: Colors.grey)),
+        Text(phone, style: const TextStyle(color: Colors.grey)),
+        if (location != null && location.isNotEmpty)
+          Text('Location: $location', style: const TextStyle(color: Colors.grey)),
+        if (bio != null && bio.isNotEmpty)
+          Text('Bio: $bio', style: const TextStyle(color: Colors.grey)),
+        if (dob != null)
+          Text('Born: ${DateFormat.yMMMMd().format(dob)}', style: const TextStyle(color: Colors.grey)),
       ],
     );
   }
@@ -126,11 +222,11 @@ class ProfileScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildStatItem('12', 'Pools\nJoined', Icons.groups),
+              _buildStatItem('${_poolStats?['joined'] ?? 0}', 'Pools\nJoined', Icons.groups),
               Container(width: 1, height: 40, color: Colors.white.withOpacity(0.3)),
-              _buildStatItem('5', 'Active\nPools', Icons.trending_up),
+              _buildStatItem('${_poolStats?['active'] ?? 0}', 'Active\nPools', Icons.trending_up),
               Container(width: 1, height: 40, color: Colors.white.withOpacity(0.3)),
-              _buildStatItem('\$5K', 'Total\nWinnings', Icons.emoji_events),
+              _buildStatItem('₹${NumberFormat.compact().format(_walletStats?['total'] ?? 0)}', 'Total\nBalance', Icons.account_balance_wallet),
             ],
           ),
           const SizedBox(height: 16),
@@ -142,9 +238,12 @@ class ProfileScreen extends StatelessWidget {
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
-                Text('Member Since', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                Text('January 2024', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              children: [
+                const Text('Member Since', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                Text(
+                  DateFormat('MMMM yyyy').format(DateTime.parse(_profile?['created_at'] ?? DateTime.now().toIso8601String())),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
               ],
             ),
           ),
@@ -188,9 +287,9 @@ class ProfileScreen extends StatelessWidget {
       mainAxisSpacing: 16,
       crossAxisSpacing: 16,
       children: [
-        _buildStatCard(context, 'Contributed', '\$8,400', Icons.savings, Colors.blue),
+        _buildStatCard(context, 'Contributed', '₹${NumberFormat.compact().format(_walletStats?['locked'] ?? 0)}', Icons.savings, Colors.blue),
         _buildStatCard(context, 'On-Time Rate', '100%', Icons.timer, Colors.green),
-        _buildStatCard(context, 'Completed', '7 Pools', Icons.check_circle, Colors.purple),
+        _buildStatCard(context, 'Completed', '${_poolStats?['completed'] ?? 0} Pools', Icons.check_circle, Colors.purple),
         _buildStatCard(context, 'Avg. Rating', '4.9/5', Icons.star, Colors.amber),
       ],
     );
@@ -254,11 +353,15 @@ class ProfileScreen extends StatelessWidget {
             children: [
               _buildMenuItem(context, 'Edit Profile', Icons.edit, () => _showEditProfileDialog(context)),
               const Divider(height: 1, indent: 56),
-              _buildMenuItem(context, 'Payment Methods', Icons.credit_card, () {}),
+              _buildMenuItem(context, 'My Created Pools', Icons.dashboard, () => context.push('/my-pools')),
+              const Divider(height: 1, indent: 56),
+              _buildMenuItem(context, 'Payment Methods', Icons.credit_card, () => context.push('/bank-accounts')),
               const Divider(height: 1, indent: 56),
               _buildMenuItem(context, 'Notification Settings', Icons.notifications, () => context.push('/notifications')),
               const Divider(height: 1, indent: 56),
-              _buildMenuItem(context, 'Privacy Settings', Icons.privacy_tip, () {}),
+              _buildMenuItem(context, 'Privacy Settings', Icons.privacy_tip, () => context.push('/privacy-policy')), // Using privacy policy for now
+              const Divider(height: 1, indent: 56),
+              _buildMenuItem(context, 'Refer & Earn', Icons.card_giftcard, () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Referral system coming soon!')))),
             ],
           ),
         ),
@@ -289,13 +392,13 @@ class ProfileScreen extends StatelessWidget {
           ),
           child: Column(
             children: [
-              _buildMenuItem(context, 'Help & Support', Icons.help_outline, () {}),
+              _buildMenuItem(context, 'Help & Support', Icons.help_outline, () => context.push('/help-support')),
               const Divider(height: 1, indent: 56),
-              _buildMenuItem(context, 'Terms of Service', Icons.description, () {}),
+              _buildMenuItem(context, 'Terms of Service', Icons.description, () => context.push('/terms')), // Ensure route exists
               const Divider(height: 1, indent: 56),
-              _buildMenuItem(context, 'Privacy Policy', Icons.policy, () {}),
+              _buildMenuItem(context, 'Privacy Policy', Icons.policy, () => context.push('/privacy-policy')), // Ensure route exists
               const Divider(height: 1, indent: 56),
-              _buildMenuItem(context, 'Export Data', Icons.download, () {}),
+              _buildMenuItem(context, 'Export Data', Icons.download, () => context.push('/export-data')),
               const Divider(height: 1, indent: 56),
               _buildMenuItem(context, 'Log Out', Icons.logout, () => _showLogoutDialog(context), isDestructive: true),
             ],

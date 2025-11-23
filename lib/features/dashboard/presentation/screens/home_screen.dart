@@ -1,130 +1,324 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import '../../../../core/services/notification_service.dart';
+import '../../../../core/services/pool_service.dart';
+import '../../../../core/services/wallet_management_service.dart';
+import '../../../../core/services/wallet_service.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  List<Map<String, dynamic>> _activePools = [];
+  List<Map<String, dynamic>> _upcomingDraws = [];
+  List<Map<String, dynamic>> _recentActivity = [];
+  Map<String, dynamic>? _wallet;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    try {
+      final pools = await PoolService.getUserPools();
+      final transactions = await WalletManagementService.getTransactions();
+      final wallet = await WalletService.getWallet();
+      
+      if (mounted) {
+        setState(() {
+          _activePools = pools.where((p) => p['status'] == 'active').toList();
+          // Mocking upcoming draws from active pools for now
+          _upcomingDraws = _activePools.take(2).toList(); 
+          _recentActivity = transactions.take(5).toList();
+          _wallet = wallet;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(context),
-              const SizedBox(height: 24),
-              _buildWalletSummary(context),
-              const SizedBox(height: 32),
-              _buildQuickActions(context),
-              const SizedBox(height: 32),
-              _buildProgressCard(context),
-              const SizedBox(height: 32),
-              _buildUpcomingDraws(context),
-              const SizedBox(height: 32),
-              _buildActivePoolsList(context),
-              const SizedBox(height: 32),
-              _buildRecentActivity(context),
-            ],
-          ),
-        ),
+        child: _isLoading 
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(context),
+                    const SizedBox(height: 24),
+                    _buildWalletSummary(context),
+                    const SizedBox(height: 32),
+                    _buildQuickActions(context),
+                    const SizedBox(height: 24),
+                    _buildNewFeatures(context),
+                    const SizedBox(height: 32),
+                    if (_activePools.isNotEmpty) ...[
+                      _buildProgressCard(context, _activePools.first),
+                      const SizedBox(height: 32),
+                    ],
+                    if (_upcomingDraws.isNotEmpty) ...[
+                      _buildUpcomingDraws(context),
+                      const SizedBox(height: 32),
+                    ],
+                    _buildActivePoolsList(context),
+                    const SizedBox(height: 32),
+                    _buildRecentActivity(context),
+                  ],
+                ),
+              ),
       ),
     );
   }
 
   Widget _buildHeader(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        GestureDetector(
-          onTap: () => context.go('/profile'),
-          child: CircleAvatar(
-            radius: 24,
-            backgroundColor: const Color(0xFFFFCCBC), // Light orange
-            child: const Icon(Icons.person, color: Colors.black87),
-          ),
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.deepPurple.shade800, Colors.deepPurple.shade600],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        Text(
-          'Welcome, Alex',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-              ),
-        ),
-        Row(
-          children: [
-            Stack(
-              children: [
-                IconButton(
-                  onPressed: () => context.push('/notifications'),
-                  icon: const Icon(Icons.notifications, size: 28),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => context.go('/profile'),
+                child: CircleAvatar(
+                  radius: 24,
+                  backgroundColor: Colors.white.withOpacity(0.2),
+                  child: const Icon(Icons.person, color: Colors.white),
                 ),
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Text(
-                      '3',
-                      style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Welcome back,',
+                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
+                  ),
+                  const Text(
+                    'Alex',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              Stack(
+                children: [
+                  IconButton(
+                    onPressed: () => context.push('/notifications'),
+                    icon: const Icon(Icons.notifications, size: 28, color: Colors.white),
+                  ),
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: FutureBuilder<int>(
+                      future: NotificationService.getUnreadCount(),
+                      builder: (context, snapshot) {
+                        final count = snapshot.data ?? 0;
+                        if (count == 0) return const SizedBox.shrink();
+                        return Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            count > 9 ? '9+' : '$count',
+                            style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              IconButton(
+                onPressed: () => context.push('/settings'),
+                icon: const Icon(Icons.settings, size: 28, color: Colors.white),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNewFeatures(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Financial Tools',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
-            IconButton(
-              onPressed: () => context.push('/settings'),
-              icon: const Icon(Icons.settings, size: 28),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6C63FF), Color(0xFF5A52D5)],
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.auto_awesome, color: Colors.white, size: 16),
+                  SizedBox(width: 4),
+                  Text(
+                    'NEW',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
+        ),
+        const SizedBox(height: 16),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _buildFeatureCard(
+                context,
+                'Smart Savings',
+                'AI-powered recommendations',
+                Icons.auto_awesome,
+                const Color(0xFF6C63FF),
+                () => context.push('/smart-savings'),
+              ),
+              const SizedBox(width: 16),
+              _buildFeatureCard(
+                context,
+                'Financial Goals',
+                'Set and achieve goals',
+                Icons.flag,
+                Colors.green,
+                () => context.push('/financial-goals'),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 
-  // ... (WalletSummary and QuickActions remain unchanged)
-
-  Widget _buildActivePoolsList(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Your Active Pools',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+  Widget _buildFeatureCard(
+    BuildContext context,
+    String title,
+    String subtitle,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        width: 200,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        _ActivePoolCard(
-          name: 'Office Savings Circle',
-          status: 'Paid',
-          nextDraw: 'Oct 24',
-          amount: '\$500',
-          members: 10,
-          progress: 0.3,
-          onTap: () => context.push('/pool-details/1'),
-          onContribute: () => context.push('/payment', extra: {'poolId': '1', 'amount': 50.0}),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Text(
+                  'Explore',
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(Icons.arrow_forward, color: color, size: 16),
+              ],
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        _ActivePoolCard(
-          name: 'Family Vacation Fund',
-          status: 'Pending',
-          nextDraw: 'Oct 28',
-          amount: '\$1,200',
-          members: 5,
-          progress: 0.66,
-          onTap: () => context.push('/pool-details/2'),
-          onContribute: () => context.push('/payment', extra: {'poolId': '2', 'amount': 100.0}),
-        ),
-      ],
+      ),
     );
   }
 
   Widget _buildWalletSummary(BuildContext context) {
+    final availableBalance = _wallet?['available_balance'] ?? 0.0;
+    final lockedBalance = _wallet?['locked_balance'] ?? 0.0;
+    final totalWinnings = _wallet?['total_winnings'] ?? 0.0;
+    final totalBalance = availableBalance + lockedBalance;
+    
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -146,16 +340,16 @@ class HomeScreen extends StatelessWidget {
             style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 24),
-          _buildSummaryRow(context, 'Total Balance', '\$1,234.56', isTotal: true),
+          _buildSummaryRow(context, 'Total Balance', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(totalBalance), isTotal: true),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 16.0),
             child: Divider(),
           ),
-          _buildSummaryRow(context, 'Amount in Active Pools', '\$500.00'),
+          _buildSummaryRow(context, 'Available Balance', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(availableBalance)),
           const SizedBox(height: 12),
-          _buildSummaryRow(context, 'Pending Contributions', '\$100.00'),
+          _buildSummaryRow(context, 'Locked in Pools', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(lockedBalance)),
           const SizedBox(height: 12),
-          _buildSummaryRow(context, 'Total Winnings (all-time)', '\$2,000.00'),
+          _buildSummaryRow(context, 'Total Winnings (all-time)', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(totalWinnings)),
           const SizedBox(height: 24),
           Row(
             children: [
@@ -172,7 +366,7 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(width: 16),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: () => context.push('/wallet'),
                   icon: const Icon(Icons.remove),
                   label: const Text('Withdraw'),
                   style: OutlinedButton.styleFrom(
@@ -184,6 +378,35 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildActivePoolsList(BuildContext context) {
+    if (_activePools.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Your Active Pools',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        ..._activePools.map((pool) => Padding(
+          padding: const EdgeInsets.only(bottom: 16.0),
+          child: _ActivePoolCard(
+            name: pool['name'],
+            status: 'Paid', // TODO: Fetch real status
+            nextDraw: DateFormat('MMM d').format(DateTime.parse(pool['start_date']).add(const Duration(days: 30))),
+            amount: '₹${pool['contribution_amount']}',
+            members: pool['current_members'],
+            progress: 0.3, // TODO: Calculate progress
+            onTap: () => context.push('/pool-details/${pool['id']}'),
+            onContribute: () => context.push('/payment', extra: {'poolId': pool['id'], 'amount': (pool['contribution_amount'] as num).toDouble()}),
+          ),
+        )),
+      ],
     );
   }
 
@@ -226,9 +449,9 @@ class HomeScreen extends StatelessWidget {
           onTap: () => context.push('/join-pool'),
         ),
         _QuickActionButton(
-          icon: Icons.folder,
-          label: 'My Pools',
-          onTap: () => context.go('/my-pools'),
+          icon: Icons.leaderboard,
+          label: 'Leaderboard',
+          onTap: () => context.push('/leaderboard'),
         ),
         _QuickActionButton(
           icon: Icons.history,
@@ -239,7 +462,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildProgressCard(BuildContext context) {
+  Widget _buildProgressCard(BuildContext context, Map<String, dynamic> pool) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -260,14 +483,14 @@ class HomeScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Time Remaining in Pool:', style: TextStyle(fontWeight: FontWeight.w500)),
-              Text('3 months 15 days', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade800)),
+              Text('3 months 15 days', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade800)), // TODO: Calculate
             ],
           ),
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: LinearProgressIndicator(
-              value: 0.75,
+              value: 0.75, // TODO: Calculate
               minHeight: 10,
               backgroundColor: const Color(0xFFFFCCBC),
               valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
@@ -277,7 +500,7 @@ class HomeScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Cycle: 9 of 12', style: TextStyle(color: Colors.grey)),
+              Text('Cycle: 1 of ${pool['total_rounds']}', style: const TextStyle(color: Colors.grey)),
               Text('75% completed', style: TextStyle(color: Colors.grey.shade800, fontWeight: FontWeight.w500)),
             ],
           ),
@@ -295,19 +518,15 @@ class HomeScreen extends StatelessWidget {
           style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
-        _DrawCard(
-          name: 'Office Savings Circle',
-          odds: '1 in 10 (10%)',
-          daysLeft: '2',
-          onTap: () => context.push('/pool-details/1'),
-        ),
-        const SizedBox(height: 16),
-        _DrawCard(
-          name: 'Family Fun Pool',
-          odds: '1 in 5 (20%)',
-          daysLeft: '5',
-          onTap: () => context.push('/pool-details/2'),
-        ),
+        ..._upcomingDraws.map((pool) => Padding(
+          padding: const EdgeInsets.only(bottom: 16.0),
+          child: _DrawCard(
+            name: pool['name'],
+            odds: '1 in ${pool['max_members']} (${(100/pool['max_members']).toStringAsFixed(0)}%)',
+            daysLeft: '5', // TODO: Calculate
+            onTap: () => context.push('/pool-details/${pool['id']}'),
+          ),
+        )),
       ],
     );
   }
@@ -321,15 +540,31 @@ class HomeScreen extends StatelessWidget {
           style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: CircleAvatar(
-            backgroundColor: const Color(0xFFFFCCBC),
-            child: const Icon(Icons.group_add, color: Colors.white),
-          ),
-          title: const Text('Alice joined your "Office Savings Circle" pool.'),
-          subtitle: const Text('2 hours ago'),
-        ),
+        const SizedBox(height: 16),
+        if (_recentActivity.isEmpty)
+          const Text('No recent activity', style: TextStyle(color: Colors.grey))
+        else
+          ..._recentActivity.map((activity) {
+            final type = activity['transaction_type'] ?? 'Transaction';
+            final amount = activity['amount'] ?? 0;
+            final date = activity['created_at'] != null 
+                ? DateFormat('MMM d, h:mm a').format(DateTime.parse(activity['created_at']))
+                : 'Unknown date';
+            final poolName = activity['pool'] != null ? activity['pool']['name'] : 'Wallet';
+
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: CircleAvatar(
+                backgroundColor: type == 'deposit' ? Colors.green.shade100 : Colors.orange.shade100,
+                child: Icon(
+                  type == 'deposit' ? Icons.arrow_downward : Icons.arrow_upward,
+                  color: type == 'deposit' ? Colors.green : Colors.orange,
+                ),
+              ),
+              title: Text('$type: ₹$amount'),
+              subtitle: Text('$poolName • $date'),
+            );
+          }),
       ],
     );
   }
