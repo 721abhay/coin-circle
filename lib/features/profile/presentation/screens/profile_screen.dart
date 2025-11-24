@@ -94,12 +94,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const SizedBox(height: 24),
             _buildAccountStats(context),
             const SizedBox(height: 24),
-            _buildAccountStats(context),
-            const SizedBox(height: 24),
-            _buildPerformanceMetrics(context),
-            const SizedBox(height: 24),
-            _buildStatsGrid(context),
-            const SizedBox(height: 24),
             _buildQuickActions(context),
             const SizedBox(height: 24),
             _buildMenuOptions(context),
@@ -146,7 +140,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final user = Supabase.instance.client.auth.currentUser;
     final email = user?.email ?? 'No Email';
     final name = _profile?['full_name'] ?? 'User';
-    final phone = _profile?['phone_number'] ?? 'No Phone';
+    final phone = _profile?['phone'] ?? 'No Phone';
     final avatarUrl = _profile?['avatar_url'];
     final location = _profile?['location'];
     final bio = _profile?['bio'];
@@ -351,6 +345,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           child: Column(
             children: [
+              _buildMenuItem(context, 'Verify Identity (KYC)', Icons.verified_user, () => context.push('/kyc-submission')),
+              const Divider(height: 1, indent: 56),
               _buildMenuItem(context, 'Edit Profile', Icons.edit, () => _showEditProfileDialog(context)),
               const Divider(height: 1, indent: 56),
               _buildMenuItem(context, 'My Created Pools', Icons.dashboard, () => context.push('/my-pools')),

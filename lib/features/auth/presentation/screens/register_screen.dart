@@ -85,11 +85,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
           password: _passwordController.text,
           userData: {
             'full_name': _nameController.text.trim(),
+            'phone': _phoneController.text.trim(),
           },
         );
 
         if (mounted) {
-          context.push('/verify-email');
+          context.push('/verify-otp?email=${Uri.encodeComponent(_emailController.text.trim())}');
         }
       } on AuthException catch (e) {
         if (mounted) {

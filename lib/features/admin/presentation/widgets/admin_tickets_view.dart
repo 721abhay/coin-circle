@@ -13,7 +13,7 @@ class AdminTicketsView extends ConsumerStatefulWidget {
 class _AdminTicketsViewState extends ConsumerState<AdminTicketsView> {
   List<Map<String, dynamic>> _tickets = [];
   bool _isLoading = true;
-  String _filter = 'pending'; // pending, solved, dismissed
+  String _filter = 'open'; // open, resolved, closed
 
   @override
   void initState() {
@@ -24,9 +24,9 @@ class _AdminTicketsViewState extends ConsumerState<AdminTicketsView> {
   Future<void> _loadTickets() async {
     setState(() => _isLoading = true);
     try {
-      // Try to fetch from 'tickets' table
+      // Fetch from 'support_tickets' table
       final response = await Supabase.instance.client
-          .from('tickets')
+          .from('support_tickets')
           .select('*, profiles(full_name, email)')
           .eq('status', _filter)
           .order('created_at', ascending: false);
@@ -38,36 +38,14 @@ class _AdminTicketsViewState extends ConsumerState<AdminTicketsView> {
         });
       }
     } catch (e) {
-      // Fallback to mock data if table doesn't exist
+      print('Error loading tickets: $e');
       if (mounted) {
         setState(() {
-          _tickets = _getMockTickets();
+          _tickets = [];
           _isLoading = false;
         });
       }
     }
-  }
-
-  List<Map<String, dynamic>> _getMockTickets() {
-    if (_filter != 'pending') return [];
-    return [
-      {
-        'id': '1',
-        'subject': 'Payment Failed',
-        'description': 'I tried to pay for the pool but it failed twice.',
-        'status': 'pending',
-        'created_at': DateTime.now().subtract(const Duration(hours: 2)).toIso8601String(),
-        'profiles': {'full_name': 'Rahul Kumar', 'email': 'rahul@example.com'}
-      },
-      {
-        'id': '2',
-        'subject': 'App Crash',
-        'description': 'App crashes when I open the profile screen.',
-        'status': 'pending',
-        'created_at': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
-        'profiles': {'full_name': 'Priya Singh', 'email': 'priya@example.com'}
-      },
-    ];
   }
 
   @override
@@ -111,11 +89,11 @@ class _AdminTicketsViewState extends ConsumerState<AdminTicketsView> {
   Widget _buildFilterTabs() {
     return Row(
       children: [
-        _buildFilterChip('Pending', 'pending'),
+        _buildFilterChip('Open', 'open'),
         const SizedBox(width: 12),
-        _buildFilterChip('Solved', 'solved'),
+        _buildFilterChip('Resolved', 'resolved'),
         const SizedBox(width: 12),
-        _buildFilterChip('Dismissed', 'dismissed'),
+        _buildFilterChip('Closed', 'closed'),
       ],
     );
   }

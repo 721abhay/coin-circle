@@ -22,7 +22,7 @@ class NotificationService {
       query = query.eq('user_id', userId);
 
       if (unreadOnly) {
-        query = query.eq('read', false);
+        query = query.eq('is_read', false);
       }
       
       // Order and limit come last
@@ -50,7 +50,7 @@ class NotificationService {
           .from('notifications')
           .count(CountOption.exact)
           .eq('user_id', userId)
-          .eq('read', false);
+          .eq('is_read', false);
 
       return response;
     } catch (e) {
@@ -64,7 +64,7 @@ class NotificationService {
     try {
       await _client
           .from('notifications')
-          .update({'read': true, 'read_at': DateTime.now().toIso8601String()})
+          .update({'is_read': true, 'read_at': DateTime.now().toIso8601String()})
           .eq('id', notificationId);
     } catch (e) {
       print('Error marking notification as read: $e');
@@ -80,9 +80,9 @@ class NotificationService {
 
       await _client
           .from('notifications')
-          .update({'read': true, 'read_at': DateTime.now().toIso8601String()})
+          .update({'is_read': true, 'read_at': DateTime.now().toIso8601String()})
           .eq('user_id', userId)
-          .eq('read', false);
+          .eq('is_read', false);
     } catch (e) {
       print('Error marking all as read: $e');
       rethrow;
@@ -113,8 +113,8 @@ class NotificationService {
         'type': type,
         'title': title,
         'message': message,
-        'data': data,
-        'read': false,
+        'metadata': data,
+        'is_read': false,
         'created_at': DateTime.now().toIso8601String(),
       });
     } catch (e) {
@@ -131,8 +131,9 @@ class NotificationService {
     }
 
     return _client
-        .from('notifications:user_id=eq.$userId')
+        .from('notifications')
         .stream(primaryKey: ['id'])
+        .eq('user_id', userId)
         .order('created_at', ascending: false);
   }
 
@@ -168,7 +169,7 @@ class NotificationService {
           .from('notifications')
           .delete()
           .eq('user_id', userId)
-          .eq('read', true);
+          .eq('is_read', true);
     } catch (e) {
       print('Error deleting read notifications: $e');
       rethrow;

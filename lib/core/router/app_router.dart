@@ -38,6 +38,7 @@ import 'package:coin_circle/features/admin/presentation/screens/pool_settings_sc
 import 'package:coin_circle/features/admin/presentation/screens/financial_controls_screen.dart';
 import 'package:coin_circle/features/admin/presentation/screens/moderation_dashboard_screen.dart';
 import 'package:coin_circle/features/admin/presentation/screens/admin_dashboard_screen.dart';
+import 'package:coin_circle/features/admin/presentation/screens/kyc_verification_screen.dart' as admin_kyc;
 import 'package:coin_circle/features/profile/presentation/screens/personal_analytics_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/help_center_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/contact_support_screen.dart';
@@ -48,6 +49,7 @@ import 'package:coin_circle/features/gamification/presentation/screens/create_re
 import 'package:coin_circle/features/gamification/presentation/screens/community_feed_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/security_settings_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/kyc_verification_screen.dart';
+import 'package:coin_circle/features/profile/presentation/screens/kyc_submission_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/privacy_controls_screen.dart';
 import 'package:coin_circle/features/disputes/presentation/screens/create_dispute_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/terms_of_service_screen.dart';
@@ -73,6 +75,8 @@ import 'package:coin_circle/features/support/presentation/screens/submit_ticket_
 import 'package:coin_circle/features/savings/presentation/screens/smart_savings_screen.dart';
 import 'package:coin_circle/features/expenses/presentation/screens/expense_tracker_screen.dart';
 import 'package:coin_circle/features/goals/presentation/screens/financial_goals_screen.dart';
+import 'package:coin_circle/features/profile/presentation/screens/setup_pin_screen.dart';
+import 'package:coin_circle/features/auth/presentation/screens/verify_otp_screen.dart';
 
 
 
@@ -98,6 +102,13 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/verify-email',
       builder: (context, state) => const EmailVerificationScreen(),
+    ),
+    GoRoute(
+      path: '/verify-otp',
+      builder: (context, state) {
+        final email = state.uri.queryParameters['email'] ?? '';
+        return VerifyOtpScreen(email: email);
+      },
     ),
     GoRoute(
       path: '/profile-setup',
@@ -421,6 +432,18 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/financial-goals',
       builder: (context, state) => const FinancialGoalsScreen(),
+    ),
+    GoRoute(
+      path: '/kyc-submission',
+      builder: (context, state) => const KYCSubmissionScreen(),
+    ),
+    GoRoute(
+      path: '/admin/kyc-verification',
+      builder: (context, state) => const admin_kyc.KYCVerificationScreen(),
+    ),
+    GoRoute(
+      path: '/setup-pin',
+      builder: (context, state) => const SetupPinScreen(),
     ),
   ],
 );

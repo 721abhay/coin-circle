@@ -167,6 +167,8 @@ class _OverviewTab extends StatelessWidget {
         children: [
           _buildStatusCard(context),
           const SizedBox(height: 24),
+          _buildInviteCodeCard(context),
+          const SizedBox(height: 24),
           _buildPaymentSection(context),
           const SizedBox(height: 24),
           _buildMembersSection(context),
@@ -252,7 +254,7 @@ class _OverviewTab extends StatelessWidget {
                 child: LinearProgressIndicator(
                   value: 0.3,
                   backgroundColor: Colors.white.withOpacity(0.2),
-                  color: Colors.white,
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                   minHeight: 6,
                 ),
               ),
@@ -271,6 +273,64 @@ class _OverviewTab extends StatelessWidget {
         const SizedBox(height: 4),
         Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ],
+    );
+  }
+
+  Widget _buildInviteCodeCard(BuildContext context) {
+    final inviteCode = pool!['invite_code'];
+    if (inviteCode == null) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Invite Code',
+                style: TextStyle(
+                  color: Colors.orange.shade900,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const Icon(Icons.copy, color: Colors.orange, size: 20),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: Text(
+              inviteCode,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 4,
+                color: Colors.orange.shade900,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Share this code with friends to join the pool.',
+            style: TextStyle(color: Colors.orange.shade800, fontSize: 12),
+          ),
+        ],
+      ),
     );
   }
 

@@ -28,6 +28,9 @@ class PoolService {
     // Calculate total amount
     final totalAmount = contributionAmount * maxMembers;
 
+    // Generate a unique 6-character invite code
+    final inviteCode = _generateInviteCode();
+
     final response = await _client.from('pools').insert({
       'creator_id': user.id,
       'name': name,
@@ -41,6 +44,7 @@ class PoolService {
       'start_date': startDate.toIso8601String(),
       'total_rounds': durationMonths,
       'status': 'pending', // Default status for new pools
+      'invite_code': inviteCode,
     }).select().single();
 
     // CRITICAL FIX: Add creator as a member of the pool immediately
@@ -53,6 +57,11 @@ class PoolService {
     });
 
     return response;
+  }
+
+  static String _generateInviteCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    return List.generate(6, (index) => chars[DateTime.now().microsecond % chars.length]).join();
   }
 
   /// Get all pools visible to the current user (public pools + creator's pools + joined pools)
@@ -101,12 +110,6 @@ class PoolService {
     final Map<String, dynamic> result = Map<String, dynamic>.from(poolResponse);
     
     if (winnerResponse != null) {
-        // Flatten the profile into the winner object if needed, or keep as is
-        // The frontend expects 'full_name' directly on the winner object in VotingTab
-        // But let's see how VotingTab uses it: widget.winner['full_name']
-        // If profiles is a nested object, we might need to map it.
-        // winnerResponse['profiles'] will be a Map.
-        
         final profile = winnerResponse['profiles'] as Map<String, dynamic>?;
         if (profile != null) {
            winnerResponse['full_name'] = profile['full_name'];
@@ -120,47 +123,89 @@ class PoolService {
     return result;
   }
 
-  /// Join a pool
-  static Future<void> joinPool(String poolId) async {
+  /// Find a pool by invite code
+  static Future<Map<String, dynamic>?> findPoolByCode(String inviteCode) async {
+    try {
+      // Try using RPC first (bypasses RLS for private pools)
+      final response = await _client.rpc('get_pool_by_invite_code', params: {'p_invite_code': inviteCode});
+      
+      if (response is List && response.isNotEmpty) {
+        return response.first as Map<String, dynamic>;
+      } else if (response is Map) {
+        return response as Map<String, dynamic>;
+      }
+      
+      // If RPC returns empty, try direct select (fallback)
+      return await _client
+          .from('pools')
+          .select()
+          .eq('invite_code', inviteCode)
+          .maybeSingle();
+    } catch (e) {
+      print('RPC findPoolByCode failed, falling back to direct select: $e');
+      // Fallback to direct select (works for public pools or if user is already member)
+      return await _client
+          .from('pools')
+          .select()
+          .eq('invite_code', inviteCode)
+          .maybeSingle();
+    }
+  }
+
+  /// Join a pool with invite code
+  static Future<void> joinPool(String poolId, String inviteCode) async {
     final user = _client.auth.currentUser;
     if (user == null) throw const AuthException('User not logged in');
 
-    // Check if already a member (RLS might handle this, but good to check)
-    final existing = await _client
-        .from('pool_members')
-        .select()
-        .eq('pool_id', poolId)
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-    if (existing != null) {
-      throw const AuthException('Already a member of this pool');
-    }
-
-    // Check if pool is full
-    final pool = await _client.from('pools').select('current_members, max_members').eq('id', poolId).single();
-    if (pool['current_members'] >= pool['max_members']) {
-      throw const AuthException('Pool is full');
-    }
-
-    await _client.from('pool_members').insert({
-      'pool_id': poolId,
-      'user_id': user.id,
-      'role': 'member',
-      'status': 'active',
-      'joined_at': DateTime.now().toIso8601String(),
+    // Use secure RPC to join (bypasses RLS)
+    await _client.rpc('join_pool_secure', params: {
+      'p_pool_id': poolId,
+      'p_invite_code': inviteCode,
     });
 
-    // Send chat notification
+    // Send chat notification about request
     try {
-      final userName = user.userMetadata?['full_name'] ?? 'A new member';
-      await ChatService.sendMemberJoinedMessage(
+      final userName = user.userMetadata?['full_name'] ?? 'A user';
+      await ChatService.sendSystemMessage(
         poolId: poolId,
-        memberName: userName,
+        content: '$userName has requested to join the pool.',
+        messageType: 'system_notification',
       );
     } catch (e) {
-      // Don't fail the join if chat notification fails
       print('Failed to send chat notification: $e');
+    }
+  }
+
+  /// Get pending join requests for a pool
+  static Future<List<Map<String, dynamic>>> getJoinRequests(String poolId) async {
+    final response = await _client
+        .from('pool_members')
+        .select('*, profile:profiles(*)')
+        .eq('pool_id', poolId)
+        .eq('status', 'pending');
+    
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  /// Approve or reject a join request
+  static Future<void> respondToJoinRequest(String poolId, String userId, bool approve) async {
+    if (approve) {
+      await _client
+          .from('pool_members')
+          .update({'status': 'active'})
+          .eq('pool_id', poolId)
+          .eq('user_id', userId);
+          
+      // Increment current_members count in pools table
+      // Note: Ideally this should be a trigger or RPC, but doing it client-side for now
+      await _client.rpc('increment_pool_members', params: {'p_pool_id': poolId});
+      
+    } else {
+      await _client
+          .from('pool_members')
+          .delete()
+          .eq('pool_id', poolId)
+          .eq('user_id', userId);
     }
   }
 

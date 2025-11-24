@@ -333,7 +333,65 @@ class _BrowsePoolsTabState extends State<_BrowsePoolsTab> {
   }
 }
 
-class _JoinByCodeTab extends StatelessWidget {
+
+
+class _JoinByCodeTab extends StatefulWidget {
+  @override
+  State<_JoinByCodeTab> createState() => _JoinByCodeTabState();
+}
+
+class _JoinByCodeTabState extends State<_JoinByCodeTab> {
+  final _codeController = TextEditingController();
+  bool _isLoading = false;
+
+  Future<void> _findAndJoinPool() async {
+    final code = _codeController.text.trim().toUpperCase();
+    if (code.length != 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid 6-character code')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final pool = await PoolService.findPoolByCode(code);
+      
+      if (mounted) {
+        setState(() => _isLoading = false);
+        
+        if (pool == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Pool not found with this code')),
+          );
+          return;
+        }
+
+        // Show preview
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+          builder: (context) => DraggableScrollableSheet(
+            initialChildSize: 0.85,
+            minChildSize: 0.5,
+            maxChildSize: 0.95,
+            expand: false,
+            builder: (context, scrollController) => _PoolPreviewSheet(scrollController: scrollController, pool: pool),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -349,26 +407,32 @@ class _JoinByCodeTab extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Enter the code shared by the pool creator',
+            'Enter the 6-character code shared by the pool creator',
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.grey),
           ),
           const SizedBox(height: 32),
           TextField(
+            controller: _codeController,
             textAlign: TextAlign.center,
+            textCapitalization: TextCapitalization.characters,
+            maxLength: 6,
             style: const TextStyle(fontSize: 24, letterSpacing: 4, fontWeight: FontWeight.bold),
             decoration: InputDecoration(
-              hintText: 'ABCD-1234',
+              hintText: 'ABCD12',
               hintStyle: TextStyle(color: Colors.grey.shade300),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              counterText: '',
             ),
           ),
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {},
-              child: const Text('Join Pool'),
+              onPressed: _isLoading ? null : _findAndJoinPool,
+              child: _isLoading 
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Find Pool'),
             ),
           ),
           const SizedBox(height: 24),
@@ -624,10 +688,14 @@ class _PoolPreviewSheet extends StatelessWidget {
 
   void _joinPool(BuildContext context) async {
     try {
-      await PoolService.joinPool(pool['id']);
+      // For public pools in discovery, we use the invite code from the pool object
+      // If it's missing (legacy data), we might need to handle it, but for now assume it's there
+      final inviteCode = pool['invite_code'] ?? '';
+      
+      await PoolService.joinPool(pool['id'], inviteCode);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Successfully joined pool!')),
+          const SnackBar(content: Text('Request sent! Waiting for admin approval.')),
         );
         context.go('/pool-details/${pool['id']}');
       }

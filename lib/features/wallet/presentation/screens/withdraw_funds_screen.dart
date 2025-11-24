@@ -212,16 +212,16 @@ class _WithdrawFundsScreenState extends State<WithdrawFundsScreen> {
       if (bankAccounts.isNotEmpty) {
         bankAccountId = bankAccounts.first['id'];
       } else {
-        // If no bank account, create a dummy one for testing or show error
-        // For this demo, we'll create one if none exists
-        bankAccountId = await WalletManagementService.addBankAccount(
-          accountHolderName: 'Demo User',
-          accountNumber: '1234567890',
-          bankName: 'Demo Bank',
-          ifscCode: 'DEMO0001',
-          accountType: 'Savings',
-          isPrimary: true,
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please add a bank account first'), 
+              backgroundColor: Colors.red
+            ),
+          );
+          setState(() => _isProcessing = false);
+        }
+        return;
       }
 
       await WalletManagementService.requestWithdrawal(

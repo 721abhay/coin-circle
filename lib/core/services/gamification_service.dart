@@ -113,6 +113,25 @@ class GamificationService {
     }
   }
 
+  // Get leaderboard data
+  static Future<List<Map<String, dynamic>>> getLeaderboard(String type) async {
+    try {
+      // For now, we'll return global leaderboard for all types as friend/pool logic 
+      // requires more complex joins that might not be ready.
+      // We join with profiles to get name and avatar.
+      final response = await _supabase
+          .from('gamification_profiles')
+          .select('current_xp, current_level, profiles(full_name, avatar_url)')
+          .order('current_xp', ascending: false)
+          .limit(50);
+      
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('Error fetching leaderboard: $e');
+      return [];
+    }
+  }
+
   // Initialize gamification profile if it doesn't exist
   static Future<void> ensureGamificationProfile() async {
     final userId = _supabase.auth.currentUser?.id;

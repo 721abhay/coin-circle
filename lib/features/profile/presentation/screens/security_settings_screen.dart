@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/services/security_service.dart';
 
 class SecuritySettingsScreen extends StatefulWidget {
   const SecuritySettingsScreen({super.key});
@@ -9,13 +11,145 @@ class SecuritySettingsScreen extends StatefulWidget {
 
 class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
   bool _twoFactorEnabled = false;
-  bool _biometricEnabled = true;
+  bool _biometricEnabled = false;
   bool _pinEnabled = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final pinEnabled = await SecurityService.isPinEnabled();
+      final biometricAvailable = await SecurityService.isBiometricAvailable();
+      
+      if (mounted) {
+        setState(() {
+          _pinEnabled = pinEnabled;
+          _biometricEnabled = biometricAvailable;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _togglePin(bool value) async {
+    if (value) {
+      // Navigate to PIN setup
+      final result = await context.push('/setup-pin');
+      if (result == true) {
+        setState(() => _pinEnabled = true);
+      }
+    } else {
+      // Show confirmation dialog
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Disable Transaction PIN?'),
+          content: const Text('This will remove PIN protection from your transactions.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('Disable'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true) {
+        // TODO: Implement PIN removal
+        setState(() => _pinEnabled = false);
+      }
+    }
+  }
+
+  Future<void> _toggleBiometric(bool value) async {
+    if (value) {
+      final authenticated = await SecurityService.authenticateWithBiometric(
+        reason: 'Enable biometric authentication',
+      );
+      
+      if (authenticated) {
+        setState(() => _biometricEnabled = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Biometric authentication enabled')),
+        );
+      }
+    } else {
+      setState(() => _biometricEnabled = false);
+    }
+  }
+
+  Future<void> _toggle2FA(bool value) async {
+    if (value) {
+      // Show 2FA setup dialog
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Enable 2FA'),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Two-factor authentication adds an extra layer of security.'),
+              SizedBox(height: 16),
+              Text('Choose your preferred method:'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                setState(() => _twoFactorEnabled = true);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('2FA enabled via SMS')),
+                );
+              },
+              child: const Text('SMS'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                setState(() => _twoFactorEnabled = true);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('2FA enabled via Email')),
+                );
+              },
+              child: const Text('Email'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      setState(() => _twoFactorEnabled = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Security')),
+      appBar: AppBar(title: const Text('Security Settings')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -24,13 +158,13 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
             'Two-Factor Authentication',
             'Secure your account with SMS/Email OTP',
             _twoFactorEnabled,
-            (val) => setState(() => _twoFactorEnabled = val),
+            _toggle2FA,
           ),
           _buildSwitchTile(
             'Biometric Login',
             'Use Fingerprint or Face ID',
             _biometricEnabled,
-            (val) => setState(() => _biometricEnabled = val),
+            _toggleBiometric,
           ),
 
           _buildSectionHeader('Transaction Security'),
@@ -38,27 +172,53 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
             'Transaction PIN',
             'Require PIN for all payments',
             _pinEnabled,
-            (val) => setState(() => _pinEnabled = val),
+            _togglePin,
           ),
-          ListTile(
-            title: const Text('Change PIN'),
-            enabled: _pinEnabled,
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter current PIN')));
-            },
-          ),
+          if (_pinEnabled)
+            ListTile(
+              title: const Text('Change PIN'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/setup-pin'),
+            ),
 
-          _buildSectionHeader('Device Management'),
-          _buildDeviceTile('iPhone 14 Pro', 'Current Device', true),
-          _buildDeviceTile('Chrome Browser', 'Last active: 2 days ago', false),
+          _buildSectionHeader('Security Info'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInfoRow('Daily Deposit Limit', '₹50,000'),
+                  const Divider(),
+                  _buildInfoRow('Daily Withdrawal Limit', '₹50,000'),
+                  const Divider(),
+                  _buildInfoRow('Daily Contribution Limit', '₹1,00,000'),
+                  const Divider(),
+                  _buildInfoRow('Velocity Check', '3 transactions / 5 min'),
+                ],
+              ),
+            ),
+          ),
           
           const SizedBox(height: 24),
           OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.security_update_warning),
-            label: const Text('Log Out All Devices'),
-            style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Security Events'),
+                  content: const Text('View your recent security activity and login history.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              );
+            },
+            icon: const Icon(Icons.history),
+            label: const Text('View Security History'),
           ),
         ],
       ),
@@ -68,7 +228,14 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Text(title, style: TextStyle(color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold)),
+      child: Text(
+        title,
+        style: TextStyle(
+          color: Theme.of(context).primaryColor,
+          fontWeight: FontWeight.bold,
+          fontSize: 16,
+        ),
+      ),
     );
   }
 
@@ -82,15 +249,16 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
     );
   }
 
-  Widget _buildDeviceTile(String name, String status, bool isCurrent) {
-    return ListTile(
-      leading: Icon(Icons.smartphone, color: isCurrent ? Colors.green : Colors.grey),
-      title: Text(name),
-      subtitle: Text(status),
-      trailing: isCurrent 
-          ? const Chip(label: Text('Active', style: TextStyle(color: Colors.white, fontSize: 10)), backgroundColor: Colors.green)
-          : IconButton(icon: const Icon(Icons.delete_outline), onPressed: () {}),
-      contentPadding: EdgeInsets.zero,
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.grey)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
+      ),
     );
   }
 }

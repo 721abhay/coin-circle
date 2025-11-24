@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/services/wallet_management_service.dart';
+import '../../../../core/services/wallet_service.dart';
+import '../../../../core/services/payment_service.dart';
 
 class AddMoneyScreen extends StatefulWidget {
   const AddMoneyScreen({super.key});
@@ -41,47 +42,63 @@ class _AddMoneyScreenState extends State<AddMoneyScreen> {
     setState(() => _isProcessing = true);
 
     try {
-      final result = await WalletManagementService.initiateDeposit(amount);
-      
-      if (mounted) {
-        setState(() => _isProcessing = false);
-        
-        // Show success dialog
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Deposit Initiated'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Order ID: ${result['order_id']}'),
-                const SizedBox(height: 8),
-                Text('Amount: ₹${amount.toStringAsFixed(2)}'),
-                const SizedBox(height: 8),
-                const Text(
-                  'Note: Payment gateway integration is pending. This is a placeholder.',
-                  style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+      // 1. Process Payment via Gateway (Simulated)
+      final paymentResult = await PaymentService.processPayment(
+        amount: amount,
+        method: 'card', // In a real app, this would come from the selected method
+        currency: 'INR',
+      );
+
+      if (paymentResult['success'] == true) {
+        // 2. If successful, update wallet balance
+        await WalletService.deposit(
+          amount: amount,
+          method: 'card',
+          reference: paymentResult['transactionId'],
+        );
+
+        if (mounted) {
+          setState(() => _isProcessing = false);
+          
+          // Show success dialog
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Payment Successful'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.green, size: 48),
+                  const SizedBox(height: 16),
+                  Text('Transaction ID: ${paymentResult['transactionId']}'),
+                  const SizedBox(height: 8),
+                  Text('Amount Added: ₹${amount.toStringAsFixed(2)}'),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Your wallet balance has been updated.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    context.pop(); // Close dialog
+                    context.pop(); // Go back to wallet
+                  },
+                  child: const Text('OK'),
                 ),
               ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  context.pop(); // Close dialog
-                  context.pop(); // Go back to wallet
-                },
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isProcessing = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Transaction Failed: $e'), backgroundColor: Colors.red),
         );
       }
     }

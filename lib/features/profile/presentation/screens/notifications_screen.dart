@@ -83,8 +83,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 
   Widget _buildNotificationTile(Map<String, dynamic> notif) {
-    final isRead = notif['read'] as bool;
-    final type = notif['type'] as String;
+    final isRead = notif['is_read'] as bool? ?? false;
+    final type = notif['type'] as String? ?? 'system';
     
     return Container(
       color: isRead ? null : Colors.blue.withOpacity(0.05),
@@ -94,7 +94,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           child: Icon(_getIconForType(type), color: _getColorForType(type)),
         ),
         title: Text(
-          notif['title'],
+          notif['title'] ?? 'Notification',
           style: TextStyle(
             fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
           ),
@@ -103,7 +103,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
-            Text(notif['message']),
+            Text(notif['message'] ?? ''),
             const SizedBox(height: 4),
             Text(
               _formatTime(notif['created_at']),
@@ -160,7 +160,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     }
   }
 
-  String _formatTime(String timestamp) {
+  String _formatTime(String? timestamp) {
+    if (timestamp == null) return '';
     final date = DateTime.parse(timestamp);
     final now = DateTime.now();
     final diff = now.difference(date);
@@ -172,7 +173,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 
   void _handleNotificationTap(Map<String, dynamic> notif) {
-    final data = notif['data'] as Map<String, dynamic>?;
+    final data = notif['metadata'] as Map<String, dynamic>?;
     if (data != null && data['pool_id'] != null) {
       context.push('/pool-details/${data['pool_id']}');
     }

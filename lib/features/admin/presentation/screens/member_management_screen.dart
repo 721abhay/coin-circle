@@ -11,16 +11,17 @@ class MemberManagementScreen extends StatefulWidget {
 }
 
 class _MemberManagementScreenState extends State<MemberManagementScreen> {
+  List<dynamic> _requests = [];
   List<dynamic> _members = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadMembers();
+    _loadData();
   }
 
-  Future<void> _loadMembers() async {
+  Future<void> _loadData() async {
     if (widget.poolId == null) {
       setState(() => _isLoading = false);
       return;
@@ -28,15 +29,39 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
 
     try {
       final pool = await PoolService.getPoolDetails(widget.poolId!);
+      final requests = await PoolService.getJoinRequests(widget.poolId!);
+      
       if (mounted) {
         setState(() {
           _members = pool['members'] ?? [];
+          _requests = requests;
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _handleRequest(String userId, bool approve) async {
+    try {
+      await PoolService.respondToJoinRequest(widget.poolId!, userId, approve);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(approve ? 'Member approved' : 'Request rejected'),
+            backgroundColor: approve ? Colors.green : Colors.red,
+          ),
+        );
+        _loadData(); // Refresh lists
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
       }
     }
   }
@@ -48,10 +73,10 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Member Management'),
-          bottom: const TabBar(
+          bottom: TabBar(
             tabs: [
-              Tab(text: 'Active Members'),
-              Tab(text: 'Join Requests'),
+              const Tab(text: 'Active Members'),
+              Tab(text: 'Join Requests (${_requests.length})'),
             ],
           ),
         ),
@@ -105,6 +130,75 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
   }
 
   Widget _buildJoinRequestsList(BuildContext context) {
-    return const Center(child: Text('No pending requests'));
+    if (_requests.isEmpty) {
+      return const Center(child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.person_add_disabled, size: 64, color: Colors.grey),
+          SizedBox(height: 16),
+          Text('No pending requests'),
+        ],
+      ));
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _requests.length,
+      itemBuilder: (context, index) {
+        final request = _requests[index];
+        final profile = request['profile'] ?? {};
+        final name = profile['full_name'] ?? 'Unknown User';
+        final email = profile['email'] ?? 'No email';
+        
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundImage: profile['avatar_url'] != null ? NetworkImage(profile['avatar_url']) : null,
+                      child: profile['avatar_url'] == null ? Text(name[0]) : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text(email, style: TextStyle(color: Colors.grey.shade600)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => _handleRequest(request['user_id'], false),
+                        style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                        child: const Text('Reject'),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => _handleRequest(request['user_id'], true),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                        child: const Text('Approve'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }

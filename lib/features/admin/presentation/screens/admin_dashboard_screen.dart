@@ -161,7 +161,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                 Icons.verified_user,
                 Colors.green,
                 () {
-                  setState(() => _selectedIndex = 1); // Navigate to Users
+                  context.push('/admin/kyc-verification');
                 },
               ),
               _buildQuickActionButton(
