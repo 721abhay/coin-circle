@@ -1,3 +1,9 @@
+-- Add 'pending' status to member_status_enum
+-- This allows members to be in pending state before approval
+
+-- First, add the new enum value
+ALTER TYPE member_status_enum ADD VALUE IF NOT EXISTS 'pending';
+
 -- Function to find a pool by invite code, bypassing RLS
 CREATE OR REPLACE FUNCTION public.get_pool_by_invite_code(p_invite_code TEXT)
 RETURNS SETOF pools
@@ -53,7 +59,7 @@ BEGIN
     RAISE EXCEPTION 'Already a member or request pending';
   END IF;
   
-  -- Insert member
+  -- Insert member with pending status
   INSERT INTO pool_members (pool_id, user_id, role, status, join_date)
   VALUES (p_pool_id, v_user_id, 'member', 'pending', NOW());
   

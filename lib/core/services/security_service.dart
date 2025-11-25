@@ -8,6 +8,13 @@ import 'package:geolocator/geolocator.dart';
 class SecurityService {
   static final _client = Supabase.instance.client;
   static final LocalAuthentication _localAuth = LocalAuthentication();
+  static bool _sessionVerified = false;
+
+  static bool get isSessionVerified => _sessionVerified;
+  
+  static void setSessionVerified(bool verified) {
+    _sessionVerified = verified;
+  }
 
   // Transaction PIN Management
   static Future<void> setTransactionPin(String pin) async {

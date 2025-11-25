@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../../core/services/pool_service.dart';
 import '../../../../core/services/wallet_management_service.dart';
 import '../../../../core/services/wallet_service.dart';
+import '../../../../core/services/security_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -15,16 +18,349 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  final _client = Supabase.instance.client;
   List<Map<String, dynamic>> _activePools = [];
   List<Map<String, dynamic>> _upcomingDraws = [];
   List<Map<String, dynamic>> _recentActivity = [];
   Map<String, dynamic>? _wallet;
   bool _isLoading = true;
+  bool _pinCheckDone = false;
 
   @override
   void initState() {
     super.initState();
-    _loadDashboardData();
+    _checkPinSetup();
+  }
+
+  Future<void> _checkPinSetup() async {
+    // Check if already verified in this session
+    if (SecurityService.isSessionVerified) {
+      _pinCheckDone = true;
+      _loadDashboardData();
+      return;
+    }
+
+    try {
+      final hasPin = await SecurityService.isPinEnabled();
+      
+      if (!hasPin && mounted) {
+        // Show mandatory PIN setup dialog
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showMandatoryPinSetup();
+        });
+      } else {
+        // User has PIN, ask them to verify it
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showPinVerification();
+        });
+      }
+    } catch (e) {
+      // If check fails, still load dashboard but log error
+      print('Error checking PIN: $e');
+      _pinCheckDone = true;
+      _loadDashboardData();
+    }
+  }
+
+  Future<void> _showPinVerification() async {
+    // Double check session state
+    if (SecurityService.isSessionVerified) return;
+
+    // Check if biometric is enabled BEFORE showing dialog
+    final prefs = await SharedPreferences.getInstance();
+    final biometricEnabled = prefs.getBool('biometric_login_enabled') ?? false;
+    final biometricAvailable = await SecurityService.isBiometricAvailable();
+    
+    // TEMPORARILY DISABLED - biometric has device compatibility issues
+    final showBiometric = false; // biometricEnabled && biometricAvailable;
+    
+    // Debug print
+    print('🔐 Biometric enabled: $biometricEnabled, available: $biometricAvailable, show: $showBiometric');
+    
+    if (!mounted) return;
+    
+    final pinController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => WillPopScope(
+        onWillPop: () async => false,
+        child: AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.lock_outline, color: Colors.blue.shade700),
+              const SizedBox(width: 12),
+              const Text('Enter PIN'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Enter your 4-digit PIN to continue',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: pinController,
+                keyboardType: TextInputType.number,
+                maxLength: 4,
+                obscureText: true,
+                autofocus: !showBiometric,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 24, letterSpacing: 16),
+                decoration: const InputDecoration(
+                  hintText: '••••',
+                  border: OutlineInputBorder(),
+                  counterText: '',
+                ),
+                onSubmitted: (value) async {
+                  if (value.length == 4) {
+                    await _verifyPin(dialogContext, value, pinController);
+                  }
+                },
+              ),
+              if (showBiometric) ...[
+                const SizedBox(height: 20),
+                const Text(
+                  'or',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      try {
+                        print('🔐 Attempting biometric authentication...');
+                        
+                        // Show loading
+                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                          const SnackBar(
+                            content: Text('Waiting for fingerprint...'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                        
+                        final authenticated = await SecurityService.authenticateWithBiometric(
+                          reason: 'Authenticate to access your account',
+                        );
+                        
+                        print('🔐 Authentication result: $authenticated');
+                        
+                        if (authenticated) {
+                          await SecurityService.resetFailedPinAttempts();
+                          SecurityService.setSessionVerified(true); // Mark session as verified
+                          if (mounted) {
+                            Navigator.of(dialogContext).pop();
+                            setState(() {
+                              _pinCheckDone = true;
+                            });
+                            _loadDashboardData();
+                          }
+                        } else {
+                          // Authentication failed or cancelled
+                          if (mounted) {
+                            ScaffoldMessenger.of(dialogContext).showSnackBar(
+                              const SnackBar(
+                                content: Text('Biometric authentication failed or cancelled. Please use PIN.'),
+                                backgroundColor: Colors.orange,
+                                duration: Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                        }
+                      } catch (e) {
+                        print('🔐 Biometric error: $e');
+                        if (mounted) {
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: ${e.toString()}'),
+                              backgroundColor: Colors.red,
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.fingerprint, size: 28),
+                    label: const Text('Use Fingerprint'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+                      side: BorderSide(color: Colors.blue.shade700, width: 2),
+                      foregroundColor: Colors.blue.shade700,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await _client.auth.signOut();
+                if (mounted) {
+                  context.go('/login');
+                }
+              },
+              child: const Text('Logout'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (pinController.text.length == 4) {
+                  await _verifyPin(dialogContext, pinController.text, pinController);
+                } else {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Please enter 4-digit PIN'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Verify'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _verifyPin(BuildContext dialogContext, String pin, TextEditingController controller) async {
+    try {
+      final isValid = await SecurityService.verifyTransactionPin(pin);
+      
+      if (isValid) {
+        await SecurityService.resetFailedPinAttempts();
+        SecurityService.setSessionVerified(true); // Mark session as verified
+        if (mounted) {
+          Navigator.of(dialogContext).pop();
+          setState(() {
+            _pinCheckDone = true;
+          });
+          _loadDashboardData();
+        }
+      } else {
+        await SecurityService.incrementFailedPinAttempts();
+        controller.clear();
+        
+        if (mounted) {
+          ScaffoldMessenger.of(dialogContext).showSnackBar(
+            const SnackBar(
+              content: Text('Incorrect PIN. Please try again.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(dialogContext).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showMandatoryPinSetup() {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Cannot dismiss
+      builder: (context) => WillPopScope(
+        onWillPop: () async => false, // Cannot go back
+        child: AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.lock, color: Colors.orange.shade700),
+              const SizedBox(width: 12),
+              const Text('Security PIN Required'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'For your security, you must set up a 4-digit PIN to protect your transactions.',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.blue.shade700, size: 16),
+                        const SizedBox(width: 8),
+                        const Text('Secure all transactions', style: TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.blue.shade700, size: 16),
+                        const SizedBox(width: 8),
+                        const Text('Protect your wallet', style: TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.check_circle, color: Colors.blue.shade700, size: 16),
+                        const SizedBox(width: 8),
+                        const Text('Prevent unauthorized access', style: TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'This is a one-time setup and takes less than a minute.',
+                style: TextStyle(fontSize: 11, color: Colors.grey, fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                final result = await context.push('/setup-pin');
+                
+                if (result == true) {
+                  // PIN was set up successfully, now verify it
+                  if (mounted) {
+                    _showPinVerification();
+                  }
+                } else {
+                  // User cancelled or failed, show dialog again
+                  if (mounted) {
+                    _showMandatoryPinSetup();
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange.shade700,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              ),
+              child: const Text('Set Up PIN Now'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadDashboardData() async {
@@ -67,8 +403,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     _buildWalletSummary(context),
                     const SizedBox(height: 32),
                     _buildQuickActions(context),
-                    const SizedBox(height: 24),
-                    _buildNewFeatures(context),
                     const SizedBox(height: 32),
                     if (_activePools.isNotEmpty) ...[
                       _buildProgressCard(context, _activePools.first),
@@ -175,143 +509,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildNewFeatures(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Financial Tools',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF6C63FF), Color(0xFF5A52D5)],
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.auto_awesome, color: Colors.white, size: 16),
-                  SizedBox(width: 4),
-                  Text(
-                    'NEW',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _buildFeatureCard(
-                context,
-                'Smart Savings',
-                'AI-powered recommendations',
-                Icons.auto_awesome,
-                const Color(0xFF6C63FF),
-                () => context.push('/smart-savings'),
-              ),
-              const SizedBox(width: 16),
-              _buildFeatureCard(
-                context,
-                'Financial Goals',
-                'Set and achieve goals',
-                Icons.flag,
-                Colors.green,
-                () => context.push('/financial-goals'),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFeatureCard(
-    BuildContext context,
-    String title,
-    String subtitle,
-    IconData icon,
-    Color color,
-    VoidCallback onTap,
-  ) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        width: 200,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: color, size: 28),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Text(
-                  'Explore',
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(Icons.arrow_forward, color: color, size: 16),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildWalletSummary(BuildContext context) {
     final availableBalance = _wallet?['available_balance'] ?? 0.0;

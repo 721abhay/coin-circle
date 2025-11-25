@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -95,8 +96,19 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Sing
                   itemBuilder: (context) {
                     final isCreator = _pool?['creator_id'] == Supabase.instance.client.auth.currentUser?.id;
                     return [
-                      if (isCreator)
+                      if (isCreator) ...[
                         const PopupMenuItem(value: 'manage', child: Text('Manage Pool (Admin)')),
+                        const PopupMenuItem(
+                          value: 'members',
+                          child: Row(
+                            children: [
+                              Icon(Icons.people_outline, size: 20),
+                              SizedBox(width: 8),
+                              Text('Member Requests'),
+                            ],
+                          ),
+                        ),
+                      ],
                       const PopupMenuItem(value: 'edit', child: Text('Edit Pool')),
                       const PopupMenuItem(value: 'mute', child: Text('Mute Notifications')),
                       const PopupMenuItem(value: 'leave', child: Text('Leave Pool')),
@@ -108,6 +120,8 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Sing
                   onSelected: (value) {
                     if (value == 'manage') {
                       context.push('/creator-dashboard/${widget.poolId}');
+                    } else if (value == 'members') {
+                      context.push('/member-management/${widget.poolId}');
                     } else if (value == 'demo_draw') {
                       context.push('/winner-selection/${widget.poolId}');
                     } else if (value == 'demo_vote') {
@@ -280,56 +294,76 @@ class _OverviewTab extends StatelessWidget {
     final inviteCode = pool!['invite_code'];
     if (inviteCode == null) return const SizedBox.shrink();
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orange.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Invite Code',
+    return GestureDetector(
+      onTap: () async {
+        await Clipboard.setData(ClipboardData(text: inviteCode));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text('Invite code "$inviteCode" copied to clipboard!'),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.orange.shade200),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Invite Code',
+                  style: TextStyle(
+                    color: Colors.orange.shade900,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const Icon(Icons.copy, color: Colors.orange, size: 20),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Text(
+                inviteCode,
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.orange.shade900,
+                  fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  letterSpacing: 4,
+                  color: Colors.orange.shade900,
                 ),
               ),
-              const Icon(Icons.copy, color: Colors.orange, size: 20),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange.shade200),
             ),
-            child: Text(
-              inviteCode,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 4,
-                color: Colors.orange.shade900,
-              ),
+            const SizedBox(height: 8),
+            Text(
+              'Tap anywhere to copy • Share this code with friends to join the pool.',
+              style: TextStyle(color: Colors.orange.shade800, fontSize: 12),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Share this code with friends to join the pool.',
-            style: TextStyle(color: Colors.orange.shade800, fontSize: 12),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

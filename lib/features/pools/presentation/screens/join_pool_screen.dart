@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/services/pool_service.dart';
+import '../../../../core/services/wallet_service.dart';
 
 class JoinPoolScreen extends StatefulWidget {
   const JoinPoolScreen({super.key});
@@ -57,111 +58,69 @@ class _JoinPoolScreenState extends State<JoinPoolScreen> with SingleTickerProvid
 class _DiscoverTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _buildSectionHeader(context, 'Trending Now'),
-        SizedBox(
-          height: 180,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: 5,
-            itemBuilder: (context, index) => _buildTrendingCard(context, index),
-          ),
-        ),
-        const SizedBox(height: 24),
-        _buildSectionHeader(context, 'Recommended for You'),
-        _buildRecommendedCard(context, 'High Savers Club', '₹5,000/month', '98% Match'),
-        _buildRecommendedCard(context, 'Vacation Fund', '₹2,000/month', '95% Match'),
-        const SizedBox(height: 24),
-        _buildSectionHeader(context, 'Categories'),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildCategoryChip(context, 'Travel', Icons.flight),
-            _buildCategoryChip(context, 'Gadgets', Icons.devices),
-            _buildCategoryChip(context, 'Emergency', Icons.medical_services),
-            _buildCategoryChip(context, 'Education', Icons.school),
+            Icon(
+              Icons.explore_outlined,
+              size: 80,
+              color: Colors.grey.shade300,
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Discover Pools',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Find trending pools and personalized recommendations',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 32),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Coming Soon',
+                    style: TextStyle(
+                      color: Colors.blue.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'For now, use "Browse" to see all pools or\n"Have Code?" to join with an invite code',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey.shade500,
+                fontSize: 12,
+              ),
+            ),
           ],
         ),
-      ],
-    );
-  }
-
-  Widget _buildSectionHeader(BuildContext context, String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Text(title, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-    );
-  }
-
-  Widget _buildTrendingCard(BuildContext context, int index) {
-    return Container(
-      width: 140,
-      margin: const EdgeInsets.only(right: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.primaries[index % Colors.primaries.length].withOpacity(0.2),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            ),
-            child: Center(child: Icon(Icons.trending_up, size: 32, color: Colors.primaries[index % Colors.primaries.length])),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Pool #${index + 100}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text('₹${(index + 1) * 1000}/mo', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.star, size: 12, color: Colors.amber),
-                    Text(' 4.${9 - index}', style: const TextStyle(fontSize: 10)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecommendedCard(BuildContext context, String title, String amount, String match) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: CircleAvatar(child: Text(title[0])),
-        title: Text(title),
-        subtitle: Text(amount),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.green.shade100,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Text(match, style: TextStyle(color: Colors.green.shade800, fontSize: 12, fontWeight: FontWeight.bold)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryChip(BuildContext context, String label, IconData icon) {
-    return Chip(
-      avatar: Icon(icon, size: 16),
-      label: Text(label),
-      backgroundColor: Colors.grey.shade100,
     );
   }
 }
@@ -653,56 +612,341 @@ class _PoolPreviewSheet extends StatelessWidget {
     );
   }
 
+  // Calculate joining fee based on contribution amount
+  double _calculateJoiningFee(double contributionAmount) {
+    if (contributionAmount < 1000) {
+      return 30.0;
+    } else if (contributionAmount < 5000) {
+      return 50.0;
+    } else {
+      return 80.0;
+    }
+  }
+
   void _showJoinConfirmation(BuildContext context) {
+    final contributionAmount = (pool['contribution_amount'] as num).toDouble();
+    final joiningFee = _calculateJoiningFee(contributionAmount);
+    final totalAmount = joiningFee + contributionAmount;
+    
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Joining'),
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Join Pool'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('You are about to join "${pool['name']}".'),
             const SizedBox(height: 16),
-            _buildSummaryRow('Monthly Payment', '₹${pool['contribution_amount']}'),
-            _buildSummaryRow('Duration', '${pool['total_rounds']} Cycles'),
-            _buildSummaryRow('First Payment', 'Due Now'),
-            const SizedBox(height: 24),
-            const Text('By confirming, you agree to the pool rules and commit to timely payments.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Column(
+                children: [
+                  _buildSummaryRow('Joining Fee', '₹${joiningFee.toStringAsFixed(0)}'),
+                  _buildSummaryRow('First Contribution', '₹${contributionAmount.toStringAsFixed(0)}'),
+                  const Divider(height: 16),
+                  _buildSummaryRow('Total to Pay Now', '₹${totalAmount.toStringAsFixed(0)}', bold: true),
+                  const Divider(height: 16),
+                  _buildSummaryRow('Monthly Payment', '₹${contributionAmount.toStringAsFixed(0)}'),
+                  _buildSummaryRow('Duration', '${pool['total_rounds']} Cycles'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'You must pay the joining fee + first contribution now. Your request will be sent to the admin for approval after payment.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'By confirming, you agree to the pool rules and commit to timely payments.',
+              style: TextStyle(fontSize: 11, color: Colors.grey),
+            ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => context.pop(), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
-            onPressed: () {
-              context.pop(); // Close dialog
-              context.pop(); // Close sheet
-              _joinPool(context);
+            onPressed: () async {
+              Navigator.of(dialogContext).pop(); // Close dialog
+              Navigator.of(context).pop(); // Close sheet
+              await _processPaymentAndJoin(context);
             },
-            child: const Text('Confirm & Pay'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+            ),
+            child: Text('Pay ₹${totalAmount.toStringAsFixed(0)} & Join'),
           ),
         ],
       ),
     );
   }
 
-  void _joinPool(BuildContext context) async {
+  Widget _buildSummaryRow(String label, String value, {bool bold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _processPaymentAndJoin(BuildContext context) async {
+    if (!context.mounted) return;
+    
+    final contributionAmount = (pool['contribution_amount'] as num).toDouble();
+    final joiningFee = _calculateJoiningFee(contributionAmount);
+    final totalAmount = joiningFee + contributionAmount;
+    final poolId = pool['id'] as String;
+    final inviteCode = pool['invite_code'] ?? '';
+    final poolName = pool['name'] ?? 'Pool';
+
+    // Show payment processing dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Processing payment...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
     try {
-      // For public pools in discovery, we use the invite code from the pool object
-      // If it's missing (legacy data), we might need to handle it, but for now assume it's there
-      final inviteCode = pool['invite_code'] ?? '';
+      // Check wallet balance first
+      final wallet = await WalletService.getWallet();
+      final availableBalance = (wallet['available_balance'] as num).toDouble();
       
-      await PoolService.joinPool(pool['id'], inviteCode);
+      if (availableBalance < totalAmount) {
+        if (context.mounted) {
+          Navigator.of(context).pop(); // Close loading dialog
+          
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Insufficient Balance'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('You need ₹${totalAmount.toStringAsFixed(0)} to join this pool.'),
+                  const SizedBox(height: 8),
+                  Text('Joining Fee: ₹${joiningFee.toStringAsFixed(0)}'),
+                  Text('First Contribution: ₹${contributionAmount.toStringAsFixed(0)}'),
+                  const Divider(height: 16),
+                  Text('Total: ₹${totalAmount.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text('Your current balance: ₹${availableBalance.toStringAsFixed(2)}'),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Please add money to your wallet first.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    context.push('/wallet/add-money');
+                  },
+                  child: const Text('Add Money'),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+
+      // Process payment - deduct total amount from wallet and create transaction
+      await WalletService.contributeToPool(
+        poolId: poolId,
+        amount: totalAmount,
+        round: 0, // 0 indicates joining fee + first contribution
+      );
+
       if (context.mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+        
+        // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Request sent! Waiting for admin approval.')),
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 8),
+                Text('Payment successful! ₹${totalAmount.toStringAsFixed(0)} paid'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
         );
-        context.go('/pool-details/${pool['id']}');
+
+        // Now join the pool
+        await _joinPool(context, inviteCode);
       }
     } catch (e) {
       if (context.mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+        
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Payment Failed'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Failed to process payment. Please try again.'),
+                const SizedBox(height: 12),
+                Text(
+                  'Error: $e',
+                  style: const TextStyle(fontSize: 12, color: Colors.red),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _joinPool(BuildContext context, String inviteCode) async {
+    // Show loading indicator
+    if (!context.mounted) return;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Sending join request...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      if (inviteCode.isEmpty) {
+        throw Exception('Invite code is missing');
+      }
+      
+      await PoolService.joinPool(pool['id'], inviteCode);
+      
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error joining pool: $e'), backgroundColor: Colors.red),
+          const SnackBar(
+            content: Text('✅ Join request sent! Waiting for admin approval.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        // Navigate to My Pools instead of pool details (user might not have access yet)
+        context.go('/my-pools');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+        
+        // Show detailed error
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Error Joining Pool'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Failed to join the pool. Please try again.'),
+                const SizedBox(height: 12),
+                Text(
+                  'Error: $e',
+                  style: const TextStyle(fontSize: 12, color: Colors.red),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Note: Make sure you have run the SQL script (fix_join_pool.sql) in your Supabase dashboard.',
+                  style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
         );
       }
     }
@@ -720,19 +964,6 @@ class _PoolPreviewSheet extends StatelessWidget {
         children: [
           Text(label, style: const TextStyle(color: Colors.grey)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSummaryRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 14)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         ],
       ),
     );

@@ -17,7 +17,7 @@ class _MyPoolsScreenState extends State<MyPoolsScreen> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -38,7 +38,6 @@ class _MyPoolsScreenState extends State<MyPoolsScreen> with SingleTickerProvider
             Tab(text: 'Active'),
             Tab(text: 'Pending'),
             Tab(text: 'Completed'),
-            Tab(text: 'Drafts'),
           ],
         ),
         actions: [
@@ -58,7 +57,6 @@ class _MyPoolsScreenState extends State<MyPoolsScreen> with SingleTickerProvider
           _PoolList(status: 'Active'),
           _PoolList(status: 'Pending'),
           _PoolList(status: 'Completed'),
-          _PoolList(status: 'Drafts'),
         ],
       ),
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/security_service.dart';
 
 class SecuritySettingsScreen extends StatefulWidget {
@@ -26,10 +27,14 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
       final pinEnabled = await SecurityService.isPinEnabled();
       final biometricAvailable = await SecurityService.isBiometricAvailable();
       
+      // Load biometric preference
+      final prefs = await SharedPreferences.getInstance();
+      final biometricPref = prefs.getBool('biometric_login_enabled') ?? false;
+      
       if (mounted) {
         setState(() {
           _pinEnabled = pinEnabled;
-          _biometricEnabled = biometricAvailable;
+          _biometricEnabled = biometricAvailable && biometricPref;
           _isLoading = false;
         });
       }
@@ -77,18 +82,62 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
 
   Future<void> _toggleBiometric(bool value) async {
     if (value) {
+      // Check if biometric is available
+      final available = await SecurityService.isBiometricAvailable();
+      if (!available) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Biometric authentication is not available on this device'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Authenticate to enable
       final authenticated = await SecurityService.authenticateWithBiometric(
-        reason: 'Enable biometric authentication',
+        reason: 'Enable biometric authentication for login',
       );
       
       if (authenticated) {
+        // Save preference
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('biometric_login_enabled', true);
+        
         setState(() => _biometricEnabled = true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Biometric authentication enabled')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Biometric login enabled successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Biometric authentication failed'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } else {
+      // Disable biometric
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('biometric_login_enabled', false);
+      
       setState(() => _biometricEnabled = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Biometric login disabled'),
+          ),
+        );
+      }
     }
   }
 

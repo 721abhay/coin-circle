@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:coin_circle/core/services/auth_service.dart';
+import '../../../../core/services/security_service.dart';
+import '../../../../core/providers/settings_provider.dart';
+import '../../../../core/services/profile_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -11,13 +15,73 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  bool _darkMode = false;
-  bool _biometricEnabled = false;
-  bool _pushNotifications = true;
-  bool _emailNotifications = true;
+  final ProfileService _profileService = ProfileService();
+  String _verificationStatus = 'Loading...';
+  String _linkedAccount = 'Loading...';
+  String _profileVisibility = 'Private';
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileData();
+  }
+
+  Future<void> _loadProfileData() async {
+    try {
+      final status = await _profileService.getVerificationStatus();
+      final provider = _profileService.getLinkedProvider();
+      final profile = await _profileService.getProfile();
+      
+      String visibility = 'Private';
+      if (profile != null) {
+        // Check if column exists, otherwise check metadata
+        if (profile.containsKey('profile_visibility')) {
+          visibility = profile['profile_visibility'] ?? 'Private';
+        } else {
+          // Fallback to metadata
+          final user = AuthService().currentUser;
+          if (user != null && user.userMetadata != null) {
+            visibility = user.userMetadata?['profile_visibility'] ?? 'Private';
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _verificationStatus = status;
+          _linkedAccount = provider;
+          _profileVisibility = visibility;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading profile data: $e');
+      if (mounted) {
+        setState(() {
+          _verificationStatus = 'Not Verified';
+          _linkedAccount = 'Email';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _updateProfileVisibility(String visibility) async {
+    setState(() => _profileVisibility = visibility);
+    await _profileService.updateProfileVisibility(visibility);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Profile visibility set to $visibility')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final settings = ref.watch(settingsProvider);
+    final settingsNotifier = ref.read(settingsProvider.notifier);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
@@ -26,7 +90,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildListTile(
             icon: Icons.person_outline,
             title: 'Personal Information',
-            onTap: () => context.push('/profile-setup'), // Re-use profile setup for editing
+            onTap: () => context.push('/profile-setup'),
           ),
           _buildListTile(
             icon: Icons.lock_outline,
@@ -36,79 +100,87 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildListTile(
             icon: Icons.verified_user_outlined,
             title: 'Verification Status',
-            trailing: const Chip(
-              label: Text('Verified', style: TextStyle(color: Colors.white, fontSize: 10)),
-              backgroundColor: Colors.green,
-              padding: EdgeInsets.zero,
-              visualDensity: VisualDensity.compact,
-            ),
+            trailing: _isLoading 
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : _verificationStatus == 'Verified'
+                    ? const Chip(
+                        label: Text('Verified', style: TextStyle(color: Colors.white, fontSize: 10)),
+                        backgroundColor: Colors.green,
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                      )
+                    : const Text('Not Verified', style: TextStyle(color: Colors.grey, fontSize: 12)),
             onTap: () => context.push('/settings/kyc'),
           ),
           _buildListTile(
             icon: Icons.link,
             title: 'Linked Accounts',
-            trailing: const Text('Google', style: TextStyle(color: Colors.grey)),
-            onTap: () {},
+            trailing: _isLoading
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : Text(_linkedAccount, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            onTap: () {
+              // Show linked accounts details
+            },
           ),
 
           _buildSectionHeader('App Settings'),
           _buildSwitchTile(
             icon: Icons.dark_mode_outlined,
             title: 'Dark Mode',
-            value: _darkMode,
-            onChanged: (val) => setState(() => _darkMode = val),
+            value: settings.darkMode,
+            onChanged: (val) async {
+              await settingsNotifier.toggleDarkMode(val);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(val ? 'Dark mode enabled' : 'Dark mode disabled')),
+              );
+            },
           ),
-          _buildListTile(
-            icon: Icons.language_outlined,
-            title: 'Language',
-            trailing: const Text('English', style: TextStyle(color: Colors.grey)),
-            onTap: () {},
-          ),
-          _buildListTile(
-            icon: Icons.currency_exchange,
-            title: 'Currency',
-            trailing: const Text('INR (₹)', style: TextStyle(color: Colors.grey)),
-            onTap: () {},
-          ),
-          _buildListTile(
-            icon: Icons.format_size,
-            title: 'Font Size',
-            trailing: const Text('Medium', style: TextStyle(color: Colors.grey)),
-            onTap: () {},
-          ),
+
           _buildSwitchTile(
             icon: Icons.data_saver_on,
             title: 'Data Saver',
-            value: false,
-            onChanged: (val) {},
+            subtitle: 'Reduce data usage',
+            value: settings.dataSaver,
+            onChanged: (val) async {
+              await settingsNotifier.toggleDataSaver(val);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(val ? 'Data saver enabled' : 'Data saver disabled')),
+              );
+            },
           ),
 
           _buildSectionHeader('Notifications'),
           _buildSwitchTile(
             icon: Icons.notifications_outlined,
             title: 'Push Notifications',
-            value: _pushNotifications,
-            onChanged: (val) => setState(() => _pushNotifications = val),
+            value: settings.pushNotifications,
+            onChanged: (val) async {
+              await settingsNotifier.togglePushNotifications(val);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(val ? 'Push notifications enabled' : 'Push notifications disabled')),
+              );
+            },
           ),
           _buildSwitchTile(
             icon: Icons.email_outlined,
             title: 'Email Updates',
-            value: _emailNotifications,
-            onChanged: (val) => setState(() => _emailNotifications = val),
+            value: settings.emailNotifications,
+            onChanged: (val) async {
+              await settingsNotifier.toggleEmailNotifications(val);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(val ? 'Email notifications enabled' : 'Email notifications disabled')),
+              );
+            },
           ),
 
           _buildSectionHeader('Privacy & Security'),
-          _buildSwitchTile(
-            icon: Icons.fingerprint,
-            title: 'Biometric Login',
-            value: _biometricEnabled,
-            onChanged: (val) => setState(() => _biometricEnabled = val),
-          ),
+          // Biometric Login removed as requested
+          
           _buildListTile(
             icon: Icons.visibility_outlined,
             title: 'Profile Visibility',
-            trailing: const Text('Public', style: TextStyle(color: Colors.grey)),
-            onTap: () {},
+            trailing: Text(_profileVisibility, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            onTap: () => _showVisibilityDialog(),
           ),
           _buildListTile(
             icon: Icons.privacy_tip_outlined,
@@ -118,14 +190,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _buildSwitchTile(
             icon: Icons.online_prediction,
             title: 'Show Online Status',
-            value: true,
-            onChanged: (val) {},
+            value: settings.showOnlineStatus,
+            onChanged: (val) async {
+              await settingsNotifier.toggleShowOnlineStatus(val);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(val ? 'Online status visible' : 'Online status hidden')),
+              );
+            },
           ),
           _buildListTile(
             icon: Icons.group_add_outlined,
             title: 'Who Can Invite Me',
-            trailing: const Text('Everyone', style: TextStyle(color: Colors.grey)),
-            onTap: () {},
+            trailing: const Text('Friends Only', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Invite permissions coming soon')),
+              );
+            },
           ),
           _buildListTile(
             icon: Icons.description_outlined,
@@ -217,16 +298,100 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget _buildSwitchTile({
     required IconData icon,
     required String title,
+    String? subtitle,
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
     return SwitchListTile(
       secondary: Icon(icon, color: Colors.grey.shade700),
       title: Text(title),
+      subtitle: subtitle != null ? Text(subtitle, style: const TextStyle(fontSize: 12)) : null,
       value: value,
       onChanged: onChanged,
       contentPadding: const EdgeInsets.symmetric(horizontal: 24),
       activeColor: Theme.of(context).primaryColor,
+    );
+  }
+
+  void _showLanguageDialog(String currentLanguage, SettingsNotifier notifier) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Select Language'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<String>(
+              title: const Text('English'),
+              value: 'English',
+              groupValue: currentLanguage,
+              onChanged: (val) async {
+                await notifier.setLanguage(val!);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Language changed to English')),
+                );
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('हिंदी (Hindi)'),
+              value: 'Hindi',
+              groupValue: currentLanguage,
+              onChanged: (val) async {
+                await notifier.setLanguage(val!);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Language changed to Hindi')),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showVisibilityDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Profile Visibility'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<String>(
+              title: const Text('Public'),
+              subtitle: const Text('Everyone can see your profile'),
+              value: 'Public',
+              groupValue: _profileVisibility,
+              onChanged: (val) {
+                _updateProfileVisibility(val!);
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('Friends Only'),
+              subtitle: const Text('Only friends can see your profile'),
+              value: 'Friends Only',
+              groupValue: _profileVisibility,
+              onChanged: (val) {
+                _updateProfileVisibility(val!);
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('Private'),
+              subtitle: const Text('Only you can see your profile'),
+              value: 'Private',
+              groupValue: _profileVisibility,
+              onChanged: (val) {
+                _updateProfileVisibility(val!);
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -256,4 +421,5 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
   }
+
 }

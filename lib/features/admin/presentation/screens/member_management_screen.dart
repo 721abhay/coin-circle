@@ -136,7 +136,9 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
         children: [
           Icon(Icons.person_add_disabled, size: 64, color: Colors.grey),
           SizedBox(height: 16),
-          Text('No pending requests'),
+          Text('No pending requests', style: TextStyle(fontSize: 16, color: Colors.grey)),
+          SizedBox(height: 8),
+          Text('Join requests will appear here', style: TextStyle(fontSize: 12, color: Colors.grey)),
         ],
       ));
     }
@@ -149,47 +151,117 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
         final profile = request['profile'] ?? {};
         final name = profile['full_name'] ?? 'Unknown User';
         final email = profile['email'] ?? 'No email';
+        final phone = profile['phone'] ?? 'No phone';
+        final joinDate = request['join_date'] != null 
+            ? DateTime.parse(request['join_date'])
+            : DateTime.now();
+        final daysAgo = DateTime.now().difference(joinDate).inDays;
         
         return Card(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 16),
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // User Header
                 Row(
                   children: [
                     CircleAvatar(
-                      backgroundImage: profile['avatar_url'] != null ? NetworkImage(profile['avatar_url']) : null,
-                      child: profile['avatar_url'] == null ? Text(name[0]) : null,
+                      radius: 30,
+                      backgroundImage: profile['avatar_url'] != null 
+                          ? NetworkImage(profile['avatar_url']) 
+                          : null,
+                      backgroundColor: Colors.blue.shade100,
+                      child: profile['avatar_url'] == null 
+                          ? Text(
+                              name.isNotEmpty ? name[0].toUpperCase() : '?',
+                              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                            )
+                          : null,
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          Text(email, style: TextStyle(color: Colors.grey.shade600)),
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
+                              const SizedBox(width: 4),
+                              Text(
+                                daysAgo == 0 ? 'Today' : '$daysAgo day${daysAgo > 1 ? 's' : ''} ago',
+                                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                              ),
+                            ],
+                          ),
                         ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.orange.shade200),
+                      ),
+                      child: const Text(
+                        'PENDING',
+                        style: TextStyle(
+                          color: Colors.orange,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
                 ),
+                
+                const Divider(height: 24),
+                
+                // User Details
+                _buildDetailRow(Icons.email, 'Email', email),
+                const SizedBox(height: 8),
+                _buildDetailRow(Icons.phone, 'Phone', phone),
+                
                 const SizedBox(height: 16),
+                
+                // Action Buttons
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
+                      child: OutlinedButton.icon(
                         onPressed: () => _handleRequest(request['user_id'], false),
-                        style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-                        child: const Text('Reject'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          side: const BorderSide(color: Colors.red),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        icon: const Icon(Icons.close, size: 18),
+                        label: const Text('Reject'),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => _handleRequest(request['user_id'], true),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                        child: const Text('Approve'),
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showApprovalConfirmation(context, request),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        icon: const Icon(Icons.check, size: 18),
+                        label: const Text('Approve'),
                       ),
                     ),
                   ],
@@ -199,6 +271,84 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Colors.grey.shade600),
+        const SizedBox(width: 8),
+        Text(
+          '$label: ',
+          style: TextStyle(
+            color: Colors.grey.shade600,
+            fontSize: 13,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showApprovalConfirmation(BuildContext context, dynamic request) {
+    final profile = request['profile'] ?? {};
+    final name = profile['full_name'] ?? 'Unknown User';
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Approve Member'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Are you sure you want to approve $name to join this pool?'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'They will be added as an active member and can start contributing.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _handleRequest(request['user_id'], true);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Confirm Approval'),
+          ),
+        ],
+      ),
     );
   }
 }
