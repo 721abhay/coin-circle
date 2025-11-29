@@ -463,24 +463,33 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 24),
           Expanded(
-            child: BarChart(
-              BarChartData(
-                gridData: const FlGridData(show: false),
-                titlesData: const FlTitlesData(
-                  rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                ),
-                borderData: FlBorderData(show: false),
-                barGroups: [
-                  _makeGroupData(0, 5),
-                  _makeGroupData(1, 6.5),
-                  _makeGroupData(2, 5),
-                  _makeGroupData(3, 7.5),
-                  _makeGroupData(4, 9),
-                  _makeGroupData(5, 11.5),
-                  _makeGroupData(6, 6.5),
-                ],
-              ),
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: AdminService.getRevenueChartData(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Center(child: Text('No revenue data available'));
+                }
+                
+                final revenueData = snapshot.data!;
+                final barGroups = revenueData.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final data = entry.value;
+                  final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
+                  return _makeGroupData(index, amount / 1000); // Convert to thousands
+                }).toList();
+                
+                return BarChart(
+                  BarChartData(
+                    gridData: const FlGridData(show: false),
+                    titlesData: const FlTitlesData(
+                      rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    ),
+                    borderData: FlBorderData(show: false),
+                    barGroups: barGroups,
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -517,14 +526,31 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           Expanded(
-            child: ListView(
-              children: [
-                _buildLogItem('User Registration', 'New user "Rahul" joined', '2m ago', Colors.blue),
-                _buildLogItem('Pool Created', 'Pool #123 created by "Amit"', '15m ago', Colors.green),
-                _buildLogItem('Withdrawal Request', '₹5,000 requested by "Priya"', '1h ago', Colors.orange),
-                _buildLogItem('System Alert', 'Database backup completed', '2h ago', Colors.grey),
-                _buildLogItem('KYC Upload', 'User "Vikram" uploaded docs', '3h ago', Colors.purple),
-              ],
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: AdminService.getRecentActivities(limit: 10),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
+                final activities = snapshot.data!;
+                if (activities.isEmpty) {
+                  return const Center(child: Text('No recent activities'));
+                }
+                
+                return ListView.builder(
+                  itemCount: activities.length,
+                  itemBuilder: (context, index) {
+                    final activity = activities[index];
+                    return _buildLogItem(
+                      activity['title'] ?? 'Activity',
+                      activity['description'] ?? '',
+                      activity['time'] ?? '',
+                      activity['color'] ?? Colors.grey,
+                    );
+                  },
+                );
+              },
             ),
           ),
         ],

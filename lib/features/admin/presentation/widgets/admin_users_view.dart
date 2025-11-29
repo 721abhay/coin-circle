@@ -113,9 +113,12 @@ class _AdminUsersViewState extends ConsumerState<AdminUsersView> {
         ],
         rows: _users.map((user) {
           final name = user['full_name'] ?? 'Unknown';
-          final email = 'user@example.com'; // Placeholder as email is in auth.users
-          final status = 'Active'; // Placeholder
+          final email = user['email'] ?? 'N/A';
+          final status = user['is_suspended'] == true ? 'Suspended' : 'Active';
           final kycStatus = user['kyc_verified'] == true ? 'Verified' : 'Pending';
+          final createdAt = user['created_at'] != null 
+              ? DateTime.parse(user['created_at']).toString().substring(0, 10)
+              : 'Unknown';
 
           return DataRow(
             cells: [
@@ -125,7 +128,12 @@ class _AdminUsersViewState extends ConsumerState<AdminUsersView> {
                     CircleAvatar(
                       radius: 16,
                       backgroundColor: Colors.blue.shade100,
-                      child: Text(name[0].toUpperCase()),
+                      backgroundImage: user['avatar_url'] != null 
+                          ? NetworkImage(user['avatar_url'])
+                          : null,
+                      child: user['avatar_url'] == null 
+                          ? Text(name[0].toUpperCase())
+                          : null,
                     ),
                     const SizedBox(width: 12),
                     Column(
@@ -143,13 +151,20 @@ class _AdminUsersViewState extends ConsumerState<AdminUsersView> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
+                    color: status == 'Active' ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text(status, style: const TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    status, 
+                    style: TextStyle(
+                      color: status == 'Active' ? Colors.green : Colors.red,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
-              DataCell(Text('Nov 22, 2025')),
+              DataCell(Text(createdAt)),
               DataCell(
                 Row(
                   children: [

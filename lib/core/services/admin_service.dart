@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 
@@ -327,6 +328,82 @@ class AdminService {
     } catch (e) {
       print('Error rejecting deposit: $e');
       rethrow;
+    }
+  }
+
+  /// Get recent system activities (admin only)
+  static Future<List<Map<String, dynamic>>> getRecentActivities({int limit = 10}) async {
+    try {
+      // Fetch recent transactions, user registrations, pool creations
+      final activities = <Map<String, dynamic>>[];
+      
+      // Recent transactions
+      final transactions = await _client
+          .from('transactions')
+          .select('*, user:profiles(full_name)')
+          .order('created_at', ascending: false)
+          .limit(limit);
+      
+      for (var txn in transactions) {
+        activities.add({
+          'type': txn['transaction_type'] ?? 'transaction',
+          'title': _getActivityTitle(txn['transaction_type']),
+          'description': '₹${txn['amount']} by ${txn['user']?['full_name'] ?? 'Unknown'}',
+          'time': _formatTimeAgo(txn['created_at']),
+          'color': _getActivityColor(txn['transaction_type']),
+        });
+      }
+      
+      // Sort by time and limit
+      activities.sort((a, b) => (b['time'] as String).compareTo(a['time'] as String));
+      return activities.take(limit).toList();
+    } catch (e) {
+      print('Error fetching activities: $e');
+      return [];
+    }
+  }
+
+  static String _getActivityTitle(String? type) {
+    switch (type) {
+      case 'contribution':
+        return 'Pool Contribution';
+      case 'payout':
+        return 'Payout Processed';
+      case 'deposit':
+        return 'Wallet Deposit';
+      case 'withdrawal':
+        return 'Withdrawal Request';
+      default:
+        return 'Transaction';
+    }
+  }
+
+  static Color _getActivityColor(String? type) {
+    switch (type) {
+      case 'contribution':
+        return Colors.blue;
+      case 'payout':
+        return Colors.green;
+      case 'deposit':
+        return Colors.purple;
+      case 'withdrawal':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  static String _formatTimeAgo(String? dateStr) {
+    if (dateStr == null) return 'Unknown';
+    try {
+      final date = DateTime.parse(dateStr);
+      final diff = DateTime.now().difference(date);
+      
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      return '${diff.inDays}d ago';
+    } catch (e) {
+      return 'Unknown';
     }
   }
 }
