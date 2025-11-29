@@ -63,7 +63,6 @@ class AdminService {
   }
 
   /// Suspend user (admin only)
-  /// Suspend user (admin only)
   static Future<void> suspendUser(String userId, String reason) async {
     try {
       await _client.rpc('suspend_user_admin', params: {
@@ -265,6 +264,69 @@ class AdminService {
     } catch (e) {
       print('Error fetching revenue data: $e');
       return [];
+    }
+  }
+
+  /// Get all deposit requests (admin only)
+  static Future<List<Map<String, dynamic>>> getDepositRequests() async {
+    try {
+      final response = await _client
+          .from('deposit_requests')
+          .select('*, user:profiles(full_name, email)')
+          .order('created_at', ascending: false);
+      
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('Error fetching deposit requests: $e');
+      return [];
+    }
+  }
+
+  /// Approve deposit request (admin only)
+  static Future<void> approveDeposit(String requestId, String userId, double amount) async {
+    try {
+      // 1. Update request status
+      await _client
+          .from('deposit_requests')
+          .update({'status': 'approved'})
+          .eq('id', requestId);
+
+      // 2. Credit user wallet
+      await _client.from('transactions').insert({
+        'user_id': userId,
+        'transaction_type': 'deposit',
+        'amount': amount,
+        'currency': 'INR',
+        'status': 'completed',
+        'payment_method': 'manual_transfer',
+        'description': 'Manual Deposit Approved',
+        'metadata': {'request_id': requestId},
+      });
+
+      await _client.rpc('increment_wallet_balance', params: {
+        'p_user_id': userId,
+        'p_amount': amount,
+      });
+
+    } catch (e) {
+      print('Error approving deposit: $e');
+      rethrow;
+    }
+  }
+
+  /// Reject deposit request (admin only)
+  static Future<void> rejectDeposit(String requestId, String reason) async {
+    try {
+      await _client
+          .from('deposit_requests')
+          .update({
+            'status': 'rejected',
+            'admin_notes': reason,
+          })
+          .eq('id', requestId);
+    } catch (e) {
+      print('Error rejecting deposit: $e');
+      rethrow;
     }
   }
 }

@@ -164,9 +164,9 @@ class _BrowsePoolsTabState extends State<_BrowsePoolsTab> {
     _loadPools();
   }
 
-  Future<void> _loadPools() async {
+  Future<void> _loadPools([String? query]) async {
     try {
-      final pools = await PoolService.getPublicPools();
+      final pools = await PoolService.getPublicPools(searchQuery: query);
       if (mounted) {
         setState(() {
           _pools = pools;
@@ -201,7 +201,7 @@ class _BrowsePoolsTabState extends State<_BrowsePoolsTab> {
                     fillColor: Colors.grey.shade100,
                   ),
                   onChanged: (value) {
-                    // TODO: Implement search
+                    _loadPools(value);
                   },
                 ),
               ),
@@ -229,13 +229,16 @@ class _BrowsePoolsTabState extends State<_BrowsePoolsTab> {
                       itemCount: _pools.length,
                       itemBuilder: (context, index) {
                         final pool = _pools[index];
+                        final creator = pool['creator'] as Map<String, dynamic>?;
+                        final creatorName = creator?['full_name'] ?? 'Pool Creator';
+                        
                         return _PoolListItem(
                           name: pool['name'],
-                          creator: 'Admin', // Creator name not always available in simple join query
+                          creator: creatorName,
                           members: '${pool['current_members']}/${pool['max_members']}',
                           amount: (pool['contribution_amount'] as num).toInt(),
                           duration: pool['total_rounds'],
-                          rating: 4.5, // Placeholder
+                          rating: 4.5, // Placeholder - would need reviews table
                           onTap: () => _showJoinPreview(context, pool),
                         );
                       },
@@ -560,7 +563,7 @@ class _PoolPreviewSheet extends StatelessWidget {
                   children: [
                     Text(pool['name'], style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    const Text('Created by Admin • 4.5 ★'),
+                    Text('Created by ${(pool['creator'] as Map<String, dynamic>?)?['full_name'] ?? 'Pool Creator'} • 4.5 ★'),
                   ],
                 ),
               ),

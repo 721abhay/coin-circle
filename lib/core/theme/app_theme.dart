@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
+  // Core colors
   static const Color primaryColor = Color(0xFFF97A53);
   static const Color lightPrimaryColor = Color(0xFFFFF2EF);
   static const Color scaffoldBgColor = Color(0xFFF9F9F9);
   static const Color textColor = Color(0xFF333333);
 
+  // Light theme
   static ThemeData get theme {
     return ThemeData(
       primaryColor: primaryColor,
       scaffoldBackgroundColor: scaffoldBgColor,
+      textTheme: GoogleFonts.interTextTheme(),
       colorScheme: const ColorScheme.light(
         primary: primaryColor,
         secondary: primaryColor,
@@ -70,12 +74,22 @@ class AppTheme {
         labelStyle: const TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
         side: BorderSide.none,
       ),
+      switchTheme: SwitchThemeData(
+        thumbColor: MaterialStateProperty.resolveWith((states) {
+          return states.contains(MaterialState.selected) ? primaryColor : Colors.grey;
+        }),
+        trackColor: MaterialStateProperty.resolveWith((states) {
+          return states.contains(MaterialState.selected) ? primaryColor.withOpacity(0.5) : Colors.grey.shade800;
+        }),
+      ),
     );
   }
 
+  // Dark theme
   static ThemeData get darkTheme {
     return ThemeData(
       brightness: Brightness.dark,
+      textTheme: GoogleFonts.interTextTheme(ThemeData(brightness: Brightness.dark).textTheme),
       primaryColor: primaryColor,
       scaffoldBackgroundColor: const Color(0xFF121212),
       colorScheme: const ColorScheme.dark(
@@ -140,12 +154,10 @@ class AppTheme {
       ),
       switchTheme: SwitchThemeData(
         thumbColor: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.selected)) return primaryColor;
-          return Colors.grey;
+          return states.contains(MaterialState.selected) ? primaryColor : Colors.grey;
         }),
         trackColor: MaterialStateProperty.resolveWith((states) {
-          if (states.contains(MaterialState.selected)) return primaryColor.withOpacity(0.5);
-          return Colors.grey.shade800;
+          return states.contains(MaterialState.selected) ? primaryColor.withOpacity(0.5) : Colors.grey.shade800;
         }),
       ),
     );

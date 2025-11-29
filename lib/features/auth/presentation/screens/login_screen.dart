@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/security_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -134,6 +135,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 32),
                 TextFormField(
+                  key: const Key('email_field'),
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
@@ -149,6 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
+                  key: const Key('password_field'),
                   controller: _passwordController,
                   obscureText: !_isPasswordVisible,
                   decoration: InputDecoration(
@@ -234,8 +237,34 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 24),
                 Center(
                   child: TextButton(
-                    onPressed: () {
-                      // TODO: Biometric login
+                    onPressed: () async {
+                      try {
+                        final authenticated = await SecurityService.authenticateWithBiometric(
+                          reason: 'Login to Coin Circle',
+                        );
+                        
+                        if (authenticated && mounted) {
+                          final prefs = await SharedPreferences.getInstance();
+                          final savedEmail = prefs.getString('saved_email');
+                          
+                          if (savedEmail != null) {
+                             _emailController.text = savedEmail;
+                             ScaffoldMessenger.of(context).showSnackBar(
+                               const SnackBar(content: Text('Biometric verified. Please enter password to confirm.')),
+                             );
+                          } else {
+                             ScaffoldMessenger.of(context).showSnackBar(
+                               const SnackBar(content: Text('Biometric verified. Please enter your credentials.')),
+                             );
+                          }
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Biometric error: $e')),
+                          );
+                        }
+                      }
                     },
                     child: Row(
                       mainAxisSize: MainAxisSize.min,

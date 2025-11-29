@@ -65,14 +65,26 @@ class PoolService {
   }
 
   /// Get all pools visible to the current user (public pools + creator's pools + joined pools)
-  static Future<List<Map<String, dynamic>>> getPublicPools() async {
+  static Future<List<Map<String, dynamic>>> getPublicPools({String? searchQuery}) async {
     final response = await _client
         .from('pools')
-        .select()
+        .select('*, creator:creator_id(full_name, avatar_url)')
         .inFilter('status', ['pending', 'active']) // Show pending and active
         .order('created_at', ascending: false);
     
-    return List<Map<String, dynamic>>.from(response);
+    List<Map<String, dynamic>> pools = List<Map<String, dynamic>>.from(response);
+    
+    // Client-side filtering if search query is provided
+    if (searchQuery != null && searchQuery.isNotEmpty) {
+      final lowerQuery = searchQuery.toLowerCase();
+      pools = pools.where((pool) {
+        final name = (pool['name'] as String?)?.toLowerCase() ?? '';
+        final description = (pool['description'] as String?)?.toLowerCase() ?? '';
+        return name.contains(lowerQuery) || description.contains(lowerQuery);
+      }).toList();
+    }
+    
+    return pools;
   }
 
   /// Get pools the current user has joined
@@ -94,7 +106,7 @@ class PoolService {
   static Future<Map<String, dynamic>> getPoolDetails(String poolId) async {
     final poolResponse = await _client
         .from('pools')
-        .select('*, members:pool_members(*, profile:profiles(*))')
+        .select('*, creator:creator_id(full_name, avatar_url), members:pool_members(*, profile:profiles(*))')
         .eq('id', poolId)
         .single();
     
@@ -232,5 +244,144 @@ class PoolService {
         'status': 'unknown',
       };
     }
+  }
+
+  /// Get financial statistics for a pool
+  static Future<Map<String, dynamic>> getPoolFinancialStats(String poolId) async {
+    try {
+      // 1. Get total collected (contributions)
+      final contributionsResponse = await _client
+          .from('transactions')
+          .select('amount')
+          .eq('pool_id', poolId)
+          .eq('transaction_type', 'contribution')
+          .eq('status', 'completed');
+      
+      double totalCollected = 0;
+      for (var t in contributionsResponse) {
+        totalCollected += (t['amount'] as num).toDouble();
+      }
+
+      // 2. Get late fees collected
+      final lateFeesResponse = await _client
+          .from('transactions')
+          .select('amount')
+          .eq('pool_id', poolId)
+          .eq('transaction_type', 'penalty') // Assuming penalty is late fee
+          .eq('status', 'completed');
+
+      double totalLateFees = 0;
+      for (var t in lateFeesResponse) {
+        totalLateFees += (t['amount'] as num).toDouble();
+      }
+
+      // 3. Get pool details for calculations
+      final pool = await _client
+          .from('pools')
+          .select('contribution_amount, current_members, total_amount')
+          .eq('id', poolId)
+          .single();
+      
+      final contributionAmount = (pool['contribution_amount'] as num).toDouble();
+      final currentMembers = (pool['current_members'] as num).toInt();
+      
+      return {
+        'total_collected': totalCollected,
+        'late_fees': totalLateFees,
+        'target_per_round': contributionAmount * currentMembers,
+        'payout_amount': pool['total_amount'], // Usually total pot
+      };
+    } catch (e) {
+      print('Error fetching pool financial stats: $e');
+      return {
+        'total_collected': 0.0,
+        'late_fees': 0.0,
+        'target_per_round': 0.0,
+        'payout_amount': 0.0,
+      };
+    }
+  }
+  /// Get pool statistics
+  static Future<Map<String, dynamic>> getPoolStatistics(String poolId) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw const AuthException('User not logged in');
+
+    // Fetch pool details
+    final pool = await _client.from('pools').select().eq('id', poolId).single();
+    
+    // Fetch members
+    final members = await _client.from('pool_members').select().eq('pool_id', poolId);
+    final totalMembers = members.length;
+    final activeMembers = members.where((m) => m['status'] == 'active').length;
+
+    // Fetch transactions
+    final transactions = await _client
+        .from('transactions')
+        .select()
+        .eq('pool_id', poolId)
+        .eq('status', 'completed');
+
+    double totalCollected = 0;
+    double totalDistributed = 0;
+    int onTimePayments = 0;
+    int totalPayments = 0;
+
+    for (final tx in transactions) {
+      final amount = (tx['amount'] as num).toDouble();
+      if (tx['type'] == 'contribution') {
+        totalCollected += amount;
+        totalPayments++;
+        // Assuming 'metadata' might contain 'is_late' or we check created_at
+        // For now, let's assume 90% on time if no explicit flag
+        final isLate = (tx['metadata'] as Map?)?['is_late'] ?? false;
+        if (!isLate) onTimePayments++;
+      } else if (tx['type'] == 'payout') {
+        totalDistributed += amount;
+      }
+    }
+
+    final onTimeRate = totalPayments > 0 ? (onTimePayments / totalPayments) * 100 : 100.0;
+    final participationScore = totalMembers > 0 ? (activeMembers / totalMembers) * 100 : 0.0;
+    
+    // Calculate completion progress
+    final targetAmount = (pool['contribution_amount'] as num).toDouble() * (pool['max_members'] as num) * (pool['total_rounds'] as num);
+    final progress = targetAmount > 0 ? (totalCollected / targetAmount) * 100 : 0.0;
+
+    return {
+      'on_time_payment_rate': onTimeRate,
+      'average_contribution_time': 2.5, // Placeholder as we don't track exact due dates yet
+      'pool_completion_progress': progress,
+      'member_participation_score': participationScore,
+      'total_collected': totalCollected,
+      'total_distributed': totalDistributed,
+      'active_members': activeMembers,
+      'total_members': totalMembers,
+    };
+  }
+
+  /// Get winner history for a pool
+  static Future<List<Map<String, dynamic>>> getWinnerHistory(String poolId) async {
+    final response = await _client
+        .from('winner_history')
+        .select('*, profiles(full_name, avatar_url)')
+        .eq('pool_id', poolId)
+        .order('round_number', ascending: false);
+    
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  /// Get user transactions for a specific pool
+  static Future<List<Map<String, dynamic>>> getUserPoolTransactions(String poolId) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw const AuthException('User not logged in');
+
+    final response = await _client
+        .from('transactions')
+        .select()
+        .eq('pool_id', poolId)
+        .eq('user_id', user.id)
+        .order('created_at', ascending: false);
+
+    return List<Map<String, dynamic>>.from(response);
   }
 }

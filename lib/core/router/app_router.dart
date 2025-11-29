@@ -48,6 +48,10 @@ import 'package:coin_circle/features/profile/presentation/screens/public_profile
 import 'package:coin_circle/features/gamification/presentation/screens/create_review_screen.dart';
 import 'package:coin_circle/features/gamification/presentation/screens/community_feed_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/security_settings_screen.dart';
+import 'package:coin_circle/features/profile/presentation/screens/bank_accounts_screen.dart' as profile;
+import 'package:coin_circle/features/profile/presentation/screens/add_bank_account_screen.dart';
+import 'package:coin_circle/features/profile/presentation/screens/personal_details_screen.dart';
+import 'package:coin_circle/features/profile/presentation/screens/edit_personal_details_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/kyc_verification_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/kyc_submission_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/privacy_controls_screen.dart';
@@ -67,7 +71,7 @@ import 'package:coin_circle/features/debug/diagnostic_screen.dart';
 // SUPPORT & WALLET
 import 'package:coin_circle/features/support/presentation/screens/help_support_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/export_data_screen.dart';
-import 'package:coin_circle/features/wallet/presentation/screens/bank_accounts_screen.dart';
+import 'package:coin_circle/features/wallet/presentation/screens/bank_accounts_screen.dart' as wallet;
 import 'package:coin_circle/features/profile/presentation/screens/terms_of_service_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/privacy_settings_screen.dart';
 import 'package:coin_circle/features/support/presentation/screens/submit_ticket_screen.dart';
@@ -77,6 +81,7 @@ import 'package:coin_circle/features/expenses/presentation/screens/expense_track
 import 'package:coin_circle/features/goals/presentation/screens/financial_goals_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/setup_pin_screen.dart';
 import 'package:coin_circle/features/auth/presentation/screens/verify_otp_screen.dart';
+import 'package:coin_circle/features/debug/database_test_screen.dart';
 
 
 
@@ -300,6 +305,25 @@ final appRouter = GoRouter(
       path: '/feedback',
       builder: (context, state) => const FeedbackScreen(),
     ),
+    // IMPORTANT: Specific /profile/* routes MUST come BEFORE /profile/:userId
+    // Otherwise GoRouter will match them as userId parameters
+    GoRoute(
+      path: '/profile/bank-accounts',
+      builder: (context, state) => const profile.BankAccountsScreen(),
+    ),
+    GoRoute(
+      path: '/profile/add-bank-account',
+      builder: (context, state) => const AddBankAccountScreen(),
+    ),
+    GoRoute(
+      path: '/profile/personal-details',
+      builder: (context, state) => const PersonalDetailsScreen(),
+    ),
+    GoRoute(
+      path: '/profile/edit-personal-details',
+      builder: (context, state) => const EditPersonalDetailsScreen(),
+    ),
+    // Parameterized route - MUST be after specific routes
     GoRoute(
       path: '/profile/:userId',
       builder: (context, state) {
@@ -406,7 +430,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/bank-accounts',
-      builder: (context, state) => const BankAccountsScreen(),
+      builder: (context, state) => const wallet.BankAccountsScreen(),
     ),
     GoRoute(
       path: '/terms',
@@ -444,6 +468,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/setup-pin',
       builder: (context, state) => const SetupPinScreen(),
+    ),
+    GoRoute(
+      path: '/database-test',
+      builder: (context, state) => const DatabaseTestScreen(),
     ),
   ],
 );

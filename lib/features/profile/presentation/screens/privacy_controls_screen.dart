@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PrivacyControlsScreen extends StatefulWidget {
   const PrivacyControlsScreen({super.key});
@@ -13,6 +14,21 @@ class _PrivacyControlsScreenState extends State<PrivacyControlsScreen> {
   bool _showBalance = false;
 
   @override
+  void initState() {
+    super.initState();
+    _loadPrivacySettings();
+  }
+
+  Future<void> _loadPrivacySettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _shareAnalytics = prefs.getBool('shareAnalytics') ?? true;
+      _publicProfile = prefs.getBool('publicProfile') ?? true;
+      _showBalance   = prefs.getBool('showBalance') ?? false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Privacy & Data')),
@@ -24,19 +40,31 @@ class _PrivacyControlsScreenState extends State<PrivacyControlsScreen> {
             'Share Analytics',
             'Help us improve with anonymous data',
             _shareAnalytics,
-            (val) => setState(() => _shareAnalytics = val),
+            (val) async {
+        setState(() => _shareAnalytics = val);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('shareAnalytics', val);
+      },
           ),
           _buildSwitchTile(
             'Public Profile',
             'Allow others to find you',
             _publicProfile,
-            (val) => setState(() => _publicProfile = val),
+            (val) async {
+        setState(() => _publicProfile = val);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('publicProfile', val);
+      },
           ),
           _buildSwitchTile(
             'Show Balance',
             'Display wallet balance on home screen',
             _showBalance,
-            (val) => setState(() => _showBalance = val),
+            (val) async {
+        setState(() => _showBalance = val);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('showBalance', val);
+      },
           ),
 
           _buildSectionHeader('Your Data Rights (GDPR/CCPA)'),

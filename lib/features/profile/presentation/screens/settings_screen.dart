@@ -122,6 +122,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               // Show linked accounts details
             },
           ),
+          _buildListTile(
+            icon: Icons.person_outline,
+            title: 'Personal Details',
+            subtitle: 'Contact, PAN, Income details',
+            onTap: () => context.push('/profile/personal-details'),
+          ),
+          _buildListTile(
+            icon: Icons.account_balance,
+            title: 'Bank Accounts',
+            subtitle: 'Manage your bank accounts',
+            onTap: () => context.push('/profile/bank-accounts'),
+          ),
 
           _buildSectionHeader('App Settings'),
           _buildSwitchTile(
@@ -239,6 +251,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: 'Account Management',
             onTap: () => context.push('/settings/account-management'),
           ),
+          _buildListTile(
+            icon: Icons.bug_report_outlined,
+            title: 'Database Test',
+            subtitle: 'Test database connection',
+            onTap: () => context.push('/database-test'),
+          ),
 
           const SizedBox(height: 24),
           Padding(
@@ -283,12 +301,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget _buildListTile({
     required IconData icon,
     required String title,
+    String? subtitle,
     Widget? trailing,
     required VoidCallback onTap,
   }) {
     return ListTile(
       leading: Icon(icon, color: Colors.grey.shade700),
       title: Text(title),
+      subtitle: subtitle != null ? Text(subtitle, style: const TextStyle(fontSize: 12)) : null,
       trailing: trailing ?? const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 24),
@@ -313,43 +333,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _showLanguageDialog(String currentLanguage, SettingsNotifier notifier) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Language'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioListTile<String>(
-              title: const Text('English'),
-              value: 'English',
-              groupValue: currentLanguage,
-              onChanged: (val) async {
-                await notifier.setLanguage(val!);
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Language changed to English')),
-                );
-              },
-            ),
-            RadioListTile<String>(
-              title: const Text('हिंदी (Hindi)'),
-              value: 'Hindi',
-              groupValue: currentLanguage,
-              onChanged: (val) async {
-                await notifier.setLanguage(val!);
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Language changed to Hindi')),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+
 
   void _showVisibilityDialog() {
     showDialog(
@@ -409,6 +393,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
+              SecurityService.setSessionVerified(false);
               await AuthService().signOut();
               if (mounted) {
                 context.go('/login');

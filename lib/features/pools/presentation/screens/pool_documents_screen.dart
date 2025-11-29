@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/services/document_service.dart';
 
 class PoolDocumentsScreen extends StatefulWidget {
   final String poolId;
+  final bool isCreator;
 
-  const PoolDocumentsScreen({super.key, required this.poolId});
+  const PoolDocumentsScreen({
+    super.key, 
+    required this.poolId,
+    this.isCreator = false,
+  });
 
   @override
   State<PoolDocumentsScreen> createState() => _PoolDocumentsScreenState();
@@ -21,47 +29,20 @@ class _PoolDocumentsScreenState extends State<PoolDocumentsScreen> {
   }
 
   Future<void> _loadDocuments() async {
-    // TODO: Load from backend
-    await Future.delayed(const Duration(seconds: 1));
-    
-    if (mounted) {
-      setState(() {
-        _documents = [
-          {
-            'id': '1',
-            'name': 'Pool Rules & Agreement',
-            'type': 'pdf',
-            'size': '245 KB',
-            'uploaded_at': DateTime.now().subtract(const Duration(days: 30)),
-            'category': 'Legal',
-          },
-          {
-            'id': '2',
-            'name': 'Member Agreement',
-            'type': 'pdf',
-            'size': '128 KB',
-            'uploaded_at': DateTime.now().subtract(const Duration(days: 30)),
-            'category': 'Legal',
-          },
-          {
-            'id': '3',
-            'name': 'Payment Receipt - Cycle 1',
-            'type': 'pdf',
-            'size': '89 KB',
-            'uploaded_at': DateTime.now().subtract(const Duration(days: 15)),
-            'category': 'Receipts',
-          },
-          {
-            'id': '4',
-            'name': 'Winner Certificate - John Doe',
-            'type': 'pdf',
-            'size': '156 KB',
-            'uploaded_at': DateTime.now().subtract(const Duration(days: 10)),
-            'category': 'Certificates',
-          },
-        ];
-        _isLoading = false;
-      });
+    try {
+      final docs = await DocumentService.getDocuments(widget.poolId);
+      if (mounted) {
+        setState(() {
+          _documents = docs;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        // Fallback to empty list if table doesn't exist yet for demo
+        setState(() => _documents = []); 
+      }
     }
   }
 
@@ -328,32 +309,44 @@ class _PoolDocumentsScreenState extends State<PoolDocumentsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Take Photo'),
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: Implement camera
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from Gallery'),
-              onTap: () {
-                Navigator.pop(context);
-                // TODO: Implement gallery picker
-              },
-            ),
-            ListTile(
               leading: const Icon(Icons.insert_drive_file),
               title: const Text('Choose File'),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(context);
-                // TODO: Implement file picker
+                final result = await FilePicker.platform.pickFiles();
+                if (result != null && result.files.single.path != null) {
+                  _uploadFile(File(result.files.single.path!), result.files.single.name);
+                }
               },
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _uploadFile(File file, String name) async {
+    setState(() => _isLoading = true);
+    try {
+      await DocumentService.uploadDocument(
+        poolId: widget.poolId,
+        file: file,
+        category: 'Other', // Default category for now
+        name: name,
+      );
+      await _loadDocuments();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Document uploaded successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: $e')),
+        );
+      }
+    }
   }
 }

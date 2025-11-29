@@ -45,5 +45,15 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<!-- Permissions -->
+	<key>NSCameraUsageDescription</key>
+	<string>We need access to your camera to take profile photos and scan QR codes.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need access to your photo library to select profile photos.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>We need your location to verify your identity and find pools near you.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>We use FaceID for secure and quick authentication.</string>
 </dict>
 </plist>

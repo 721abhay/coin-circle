@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/pool_service.dart';
 import '../../../../core/services/wallet_management_service.dart';
+import '../../../../core/services/admin_service.dart';
 
 // Import extra admin widgets
 import '../widgets/admin_disputes_tab.dart';
@@ -62,20 +63,29 @@ class _AdminMoreScreenState extends ConsumerState<AdminMoreScreen>
         children: [
           const AdminDisputesTab(),
           const AdminWithdrawalsTab(),
-          AnalyticsTab(stats: PlatformStats(
-            totalUsers: 0,
-            activeUsers: 0,
-            suspendedUsers: 0,
-            totalPools: 0,
-            activePools: 0,
-            pendingPools: 0,
-            completedPools: 0,
-            totalTransactions: 0,
-            totalTransactionVolume: 0.0,
-            totalPayouts: 0.0,
-            averagePoolSize: 0.0,
-            averageContribution: 0.0,
-          )),
+          FutureBuilder<Map<String, dynamic>>(
+            future: AdminService.getPlatformStats(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final data = snapshot.data ?? {};
+              return AnalyticsTab(stats: PlatformStats(
+                totalUsers: data['totalUsers'] ?? 0,
+                activeUsers: data['activeUsers'] ?? 0,
+                suspendedUsers: data['suspendedUsers'] ?? 0,
+                totalPools: data['totalPools'] ?? 0,
+                activePools: data['activePools'] ?? 0,
+                pendingPools: data['pendingPools'] ?? 0,
+                completedPools: data['completedPools'] ?? 0,
+                totalTransactions: data['totalTransactions'] ?? 0,
+                totalTransactionVolume: (data['totalTransactionVolume'] as num?)?.toDouble() ?? 0.0,
+                totalPayouts: (data['totalPayouts'] as num?)?.toDouble() ?? 0.0,
+                averagePoolSize: (data['averagePoolSize'] as num?)?.toDouble() ?? 0.0,
+                averageContribution: (data['averageContribution'] as num?)?.toDouble() ?? 0.0,
+              ));
+            },
+          ),
           const PoolOversightTab(),
           const UserManagementTab(),
         ],

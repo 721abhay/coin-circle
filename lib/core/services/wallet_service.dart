@@ -74,7 +74,32 @@ class WalletService {
     }
   }
 
-  /// Deposit funds with security checks
+  /// Request a manual deposit (User sends money, Admin approves)
+  static Future<void> requestDeposit({
+    required double amount,
+    required String transactionReference,
+    String? proofUrl,
+  }) async {
+    if (_userId == null) throw Exception('User not logged in');
+
+    try {
+      await _client.from('deposit_requests').insert({
+        'user_id': _userId,
+        'amount': amount,
+        'transaction_reference': transactionReference,
+        'proof_url': proofUrl,
+        'status': 'pending',
+      });
+      
+      // Log for audit
+      print('Deposit request submitted: $amount, Ref: $transactionReference');
+    } catch (e) {
+      print('Error requesting deposit: $e');
+      rethrow;
+    }
+  }
+
+  /// Deposit funds (Internal/Admin use or after Gateway success)
   static Future<void> deposit({
     required double amount,
     String method = 'bank_transfer',
@@ -406,6 +431,23 @@ class WalletService {
     } catch (e) {
       print('Error crediting winnings: $e');
       rethrow;
+    }
+  }
+  /// Get user's payment methods (bank accounts)
+  static Future<List<Map<String, dynamic>>> getPaymentMethods() async {
+    if (_userId == null) return [];
+
+    try {
+      final response = await _client
+          .from('bank_accounts')
+          .select()
+          .eq('user_id', _userId!)
+          .order('is_primary', ascending: false);
+      
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('Error fetching payment methods: $e');
+      return [];
     }
   }
 }

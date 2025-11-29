@@ -23,6 +23,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   List<Map<String, dynamic>> _upcomingDraws = [];
   List<Map<String, dynamic>> _recentActivity = [];
   Map<String, dynamic>? _wallet;
+  String _userName = 'User';
   bool _isLoading = true;
   bool _pinCheckDone = false;
 
@@ -369,17 +370,63 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final transactions = await WalletManagementService.getTransactions();
       final wallet = await WalletService.getWallet();
       
+      // Fetch user profile for name
+      final userId = _client.auth.currentUser?.id;
+      String userName = 'User';
+      if (userId != null) {
+        try {
+          final profile = await _client
+              .from('profiles')
+              .select('full_name')
+              .eq('id', userId)
+              .single();
+          userName = profile['full_name'] ?? 'User';
+        } catch (e) {
+          print('Error fetching user name: $e');
+        }
+      }
+      
+      // Enrich pools with status and calculations
+      final enrichedPools = await Future.wait(pools.map((pool) async {
+        final poolId = pool['id'];
+        final status = await PoolService.getContributionStatus(poolId);
+        
+        // Calculate progress
+        final startDate = DateTime.parse(pool['start_date']);
+        final totalRounds = pool['total_rounds'] as int;
+        final now = DateTime.now();
+        
+        // Simple calculation for current round based on monthly frequency
+        // In a real app, this should be stored in DB or more robust
+        final daysSinceStart = now.difference(startDate).inDays;
+        final currentRound = (daysSinceStart / 30).floor() + 1;
+        final clampedRound = currentRound.clamp(1, totalRounds);
+        
+        final nextDrawDate = startDate.add(Duration(days: 30 * clampedRound));
+        final daysLeft = nextDrawDate.difference(now).inDays;
+        
+        return {
+          ...pool,
+          'contribution_status': status,
+          'current_round': clampedRound,
+          'days_left': daysLeft > 0 ? daysLeft : 0,
+          'progress': clampedRound / totalRounds,
+          'next_draw': nextDrawDate.toIso8601String(),
+        };
+      }));
+
       if (mounted) {
         setState(() {
-          _activePools = pools.where((p) => p['status'] == 'active').toList();
-          // Mocking upcoming draws from active pools for now
+          _activePools = enrichedPools.where((p) => p['status'] == 'active').toList();
           _upcomingDraws = _activePools.take(2).toList(); 
           _recentActivity = transactions.take(5).toList();
           _wallet = wallet;
+          _userName = userName;
           _isLoading = false;
         });
       }
     } catch (e) {
+      print('Error loading dashboard: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -454,9 +501,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     'Welcome back,',
                     style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12),
                   ),
-                  const Text(
-                    'Alex',
-                    style: TextStyle(
+                  Text(
+                    _userName,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 20,
@@ -590,19 +637,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
-        ..._activePools.map((pool) => Padding(
-          padding: const EdgeInsets.only(bottom: 16.0),
-          child: _ActivePoolCard(
-            name: pool['name'],
-            status: 'Paid', // TODO: Fetch real status
-            nextDraw: DateFormat('MMM d').format(DateTime.parse(pool['start_date']).add(const Duration(days: 30))),
-            amount: '₹${pool['contribution_amount']}',
-            members: pool['current_members'],
-            progress: 0.3, // TODO: Calculate progress
-            onTap: () => context.push('/pool-details/${pool['id']}'),
-            onContribute: () => context.push('/payment', extra: {'poolId': pool['id'], 'amount': (pool['contribution_amount'] as num).toDouble()}),
-          ),
-        )),
+        ..._activePools.map((pool) {
+          final status = pool['contribution_status'];
+          final isPaid = status['is_paid'] == true;
+          final statusText = isPaid ? 'Paid' : 'Due';
+          
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16.0),
+            child: _ActivePoolCard(
+              name: pool['name'],
+              status: statusText,
+              nextDraw: DateFormat('MMM d').format(DateTime.parse(pool['next_draw'])),
+              amount: '₹${pool['contribution_amount']}',
+              members: pool['current_members'],
+              progress: (pool['progress'] as double),
+              onTap: () => context.push('/pool-details/${pool['id']}'),
+              onContribute: () => context.push('/payment', extra: {'poolId': pool['id'], 'amount': (pool['contribution_amount'] as num).toDouble()}),
+            ),
+          );
+        }),
       ],
     );
   }
@@ -680,14 +733,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Time Remaining in Pool:', style: TextStyle(fontWeight: FontWeight.w500)),
-              Text('3 months 15 days', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade800)), // TODO: Calculate
+              Text('${pool['days_left']} days', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey.shade800)),
             ],
           ),
           const SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: LinearProgressIndicator(
-              value: 0.75, // TODO: Calculate
+              value: (pool['progress'] as double),
               minHeight: 10,
               backgroundColor: const Color(0xFFFFCCBC),
               valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
@@ -697,8 +750,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Cycle: 1 of ${pool['total_rounds']}', style: const TextStyle(color: Colors.grey)),
-              Text('75% completed', style: TextStyle(color: Colors.grey.shade800, fontWeight: FontWeight.w500)),
+              Text('Cycle: ${pool['current_round']} of ${pool['total_rounds']}', style: const TextStyle(color: Colors.grey)),
+              Text('${((pool['progress'] as double) * 100).toInt()}% completed', style: TextStyle(color: Colors.grey.shade800, fontWeight: FontWeight.w500)),
             ],
           ),
         ],
@@ -720,7 +773,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: _DrawCard(
             name: pool['name'],
             odds: '1 in ${pool['max_members']} (${(100/pool['max_members']).toStringAsFixed(0)}%)',
-            daysLeft: '5', // TODO: Calculate
+            daysLeft: pool['days_left'].toString(),
             onTap: () => context.push('/pool-details/${pool['id']}'),
           ),
         )),

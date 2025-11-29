@@ -18,6 +18,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Map<String, dynamic>? _profile;
   Map<String, double>? _walletStats;
   Map<String, int>? _poolStats;
+  Map<String, dynamic>? _performanceMetrics;
 
   @override
   void initState() {
@@ -44,6 +45,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         final joined = pools.length;
         final active = pools.where((p) => p['status'] == 'active').length;
         final completed = pools.where((p) => p['status'] == 'completed').length;
+        
+        // Calculate performance metrics
+        final metrics = await _calculatePerformanceMetrics(user.id);
 
         if (mounted) {
           setState(() {
@@ -54,6 +58,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               'active': active,
               'completed': completed,
             };
+            _performanceMetrics = metrics;
             _isLoading = false;
           });
         }
@@ -63,6 +68,53 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         setState(() => _isLoading = false);
         // Handle error silently or show snackbar
       }
+    }
+  }
+  
+  Future<Map<String, dynamic>> _calculatePerformanceMetrics(String userId) async {
+    try {
+      // Fetch all transactions
+      final transactions = await Supabase.instance.client
+          .from('transactions')
+          .select()
+          .eq('user_id', userId);
+      
+      // Calculate total contributed
+      double totalContributed = 0;
+      int totalPayments = 0;
+      int onTimePayments = 0;
+      
+      for (var txn in transactions) {
+        if (txn['type'] == 'contribution' && txn['status'] == 'completed') {
+          totalContributed += (txn['amount'] as num).toDouble();
+          totalPayments++;
+          
+          // Check if payment was on time (no late fee)
+          if (txn['late_fee'] == null || txn['late_fee'] == 0) {
+            onTimePayments++;
+          }
+        }
+      }
+      
+      // Calculate on-time percentage
+      double onTimeRate = totalPayments > 0 ? (onTimePayments / totalPayments * 100) : 100;
+      
+      // Calculate trust score (based on on-time rate and activity)
+      double trustScore = onTimeRate * 0.7 + (totalPayments > 0 ? 30 : 0);
+      trustScore = trustScore.clamp(0, 100);
+      
+      return {
+        'trustScore': trustScore.round(),
+        'onTimeRate': onTimeRate.round(),
+        'totalContributed': totalContributed,
+      };
+    } catch (e) {
+      print('Error calculating metrics: $e');
+      return {
+        'trustScore': 0,
+        'onTimeRate': 0,
+        'totalContributed': 0.0,
+      };
     }
   }
 
@@ -94,6 +146,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const SizedBox(height: 24),
             _buildAccountStats(context),
             const SizedBox(height: 24),
+            _buildPerformanceMetrics(context),
+            const SizedBox(height: 24),
             _buildQuickActions(context),
             const SizedBox(height: 24),
             _buildMenuOptions(context),
@@ -104,12 +158,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildPerformanceMetrics(BuildContext context) {
+    final trustScore = _performanceMetrics?['trustScore'] ?? 0;
+    final onTimeRate = _performanceMetrics?['onTimeRate'] ?? 0;
+    final totalContributed = _performanceMetrics?['totalContributed'] ?? 0.0;
+    
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _buildMetricItem('Trust Score', '98/100', Colors.green),
-        _buildMetricItem('On-Time', '100%', Colors.blue),
-        _buildMetricItem('Contributed', '₹1.2L', Colors.orange),
+        _buildMetricItem('Trust Score', '$trustScore/100', Colors.green),
+        _buildMetricItem('On-Time', '$onTimeRate%', Colors.blue),
+        _buildMetricItem('Contributed', '₹${NumberFormat.compact().format(totalContributed)}', Colors.orange),
       ],
     );
   }

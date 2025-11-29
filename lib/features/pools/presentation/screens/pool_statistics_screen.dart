@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../../../../core/services/pool_service.dart';
 
 class PoolStatisticsScreen extends StatefulWidget {
   final String poolId;
@@ -21,23 +22,21 @@ class _PoolStatisticsScreenState extends State<PoolStatisticsScreen> {
   }
 
   Future<void> _loadStatistics() async {
-    // TODO: Load from backend
-    await Future.delayed(const Duration(seconds: 1));
-    
-    if (mounted) {
-      setState(() {
-        _stats = {
-          'on_time_payment_rate': 92.5,
-          'average_contribution_time': 2.3,
-          'pool_completion_progress': 45.0,
-          'member_participation_score': 88.0,
-          'total_collected': 45000.0,
-          'total_distributed': 20000.0,
-          'active_members': 8,
-          'total_members': 10,
-        };
-        _isLoading = false;
-      });
+    try {
+      final stats = await PoolService.getPoolStatistics(widget.poolId);
+      if (mounted) {
+        setState(() {
+          _stats = stats;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading statistics: $e')),
+        );
+      }
     }
   }
 

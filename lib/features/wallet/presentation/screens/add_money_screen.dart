@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/services/wallet_service.dart';
-import '../../../../core/services/payment_service.dart';
 
 class AddMoneyScreen extends StatefulWidget {
   const AddMoneyScreen({super.key});
@@ -12,14 +12,24 @@ class AddMoneyScreen extends StatefulWidget {
 
 class _AddMoneyScreenState extends State<AddMoneyScreen> {
   final _amountController = TextEditingController();
+  final _referenceController = TextEditingController();
   double _selectedAmount = 0;
   bool _isProcessing = false;
 
   final List<double> _quickAmounts = [100, 500, 1000, 2000, 5000];
+  
+  // ⚠️ IMPORTANT: UPDATE THESE WITH YOUR REAL BANK DETAILS BEFORE LAUNCH! ⚠️
+  // Admin Bank Details - Users will transfer money to these accounts
+  // TODO: Replace with your actual UPI ID, Bank Name, Account Number, and IFSC Code
+  final String _adminUpiId = 'admin@coincircle';  // ← UPDATE THIS
+  final String _adminBankName = 'HDFC Bank';      // ← UPDATE THIS
+  final String _adminAccountNo = '50100123456789'; // ← UPDATE THIS
+  final String _adminIfsc = 'HDFC0001234';        // ← UPDATE THIS
 
   @override
   void dispose() {
     _amountController.dispose();
+    _referenceController.dispose();
     super.dispose();
   }
 
@@ -30,8 +40,10 @@ class _AddMoneyScreenState extends State<AddMoneyScreen> {
     });
   }
 
-  Future<void> _processDeposit() async {
+  Future<void> _submitDepositRequest() async {
     final amount = double.tryParse(_amountController.text);
+    final reference = _referenceController.text.trim();
+
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a valid amount'), backgroundColor: Colors.red),
@@ -39,69 +51,71 @@ class _AddMoneyScreenState extends State<AddMoneyScreen> {
       return;
     }
 
+    if (reference.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter the Transaction Reference ID'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
     setState(() => _isProcessing = true);
 
     try {
-      // 1. Process Payment via Gateway (Simulated)
-      final paymentResult = await PaymentService.processPayment(
+      await WalletService.requestDeposit(
         amount: amount,
-        method: 'card', // In a real app, this would come from the selected method
-        currency: 'INR',
+        transactionReference: reference,
       );
 
-      if (paymentResult['success'] == true) {
-        // 2. If successful, update wallet balance
-        await WalletService.deposit(
-          amount: amount,
-          method: 'card',
-          reference: paymentResult['transactionId'],
-        );
-
-        if (mounted) {
-          setState(() => _isProcessing = false);
-          
-          // Show success dialog
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Payment Successful'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.green, size: 48),
-                  const SizedBox(height: 16),
-                  Text('Transaction ID: ${paymentResult['transactionId']}'),
-                  const SizedBox(height: 8),
-                  Text('Amount Added: ₹${amount.toStringAsFixed(2)}'),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Your wallet balance has been updated.',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    context.pop(); // Close dialog
-                    context.pop(); // Go back to wallet
-                  },
-                  child: const Text('OK'),
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        
+        // Show success dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Request Submitted'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.check_circle, color: Colors.green, size: 48),
+                const SizedBox(height: 16),
+                const Text('Your deposit request has been submitted successfully.'),
+                const SizedBox(height: 8),
+                const Text(
+                  'The amount will be credited to your wallet once the admin verifies your transaction (usually within 1-2 hours).',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
                 ),
               ],
             ),
-          );
-        }
+            actions: [
+              TextButton(
+                onPressed: () {
+                  context.pop(); // Close dialog
+                  context.pop(); // Go back to wallet
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isProcessing = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Transaction Failed: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Submission Failed: $e'), backgroundColor: Colors.red),
         );
       }
     }
+  }
+
+  void _copyToClipboard(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Copied to clipboard'), duration: Duration(seconds: 1)),
+    );
   }
 
   @override
@@ -115,10 +129,26 @@ class _AddMoneyScreenState extends State<AddMoneyScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Quick Amount Selection
+            // Step 1: Enter Amount
             Text(
-              'Quick Select',
+              'Step 1: Enter Amount',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                prefixText: '₹ ',
+                hintText: 'Enter amount',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (value) {
+                final amount = double.tryParse(value);
+                setState(() {
+                  _selectedAmount = amount ?? 0;
+                });
+              },
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -138,98 +168,58 @@ class _AddMoneyScreenState extends State<AddMoneyScreen> {
                 );
               }).toList(),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
-            // Custom Amount Input
+            // Step 2: Make Payment
             Text(
-              'Or Enter Custom Amount',
+              'Step 2: Transfer Money',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Send money to the following account:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  _buildCopyRow('UPI ID', _adminUpiId),
+                  const Divider(),
+                  _buildCopyRow('Bank Name', _adminBankName),
+                  const SizedBox(height: 8),
+                  _buildCopyRow('Account No', _adminAccountNo),
+                  const SizedBox(height: 8),
+                  _buildCopyRow('IFSC Code', _adminIfsc),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // Step 3: Enter Reference
+            Text(
+              'Step 3: Submit Details',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             TextField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
+              controller: _referenceController,
               decoration: const InputDecoration(
-                prefixText: '₹ ',
-                hintText: 'Enter amount',
+                labelText: 'Transaction Reference ID / UTR',
+                hintText: 'e.g. 123456789012',
                 border: OutlineInputBorder(),
-              ),
-              onChanged: (value) {
-                final amount = double.tryParse(value);
-                setState(() {
-                  _selectedAmount = amount ?? 0;
-                });
-              },
-            ),
-            const SizedBox(height: 24),
-
-            // Payment Summary
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Payment Summary',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildSummaryRow('Amount', '₹${_selectedAmount.toStringAsFixed(2)}'),
-                    _buildSummaryRow('Processing Fee', '₹0.00'),
-                    const Divider(),
-                    _buildSummaryRow(
-                      'Total',
-                      '₹${_selectedAmount.toStringAsFixed(2)}',
-                      isTotal: true,
-                    ),
-                  ],
-                ),
+                helperText: 'Enter the reference number from your payment app',
               ),
             ),
             const SizedBox(height: 24),
 
-            // Payment Method (Placeholder)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Payment Method',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 12),
-                    ListTile(
-                      leading: const Icon(Icons.credit_card),
-                      title: const Text('Credit/Debit Card'),
-                      subtitle: const Text('Visa, Mastercard, RuPay'),
-                      trailing: Radio(value: true, groupValue: true, onChanged: null),
-                    ),
-                    const Divider(height: 1),
-                    ListTile(
-                      leading: const Icon(Icons.account_balance),
-                      title: const Text('Net Banking'),
-                      subtitle: const Text('All major banks'),
-                      trailing: Radio(value: false, groupValue: true, onChanged: null),
-                    ),
-                    const Divider(height: 1),
-                    ListTile(
-                      leading: const Icon(Icons.wallet),
-                      title: const Text('UPI'),
-                      subtitle: const Text('Google Pay, PhonePe, Paytm'),
-                      trailing: Radio(value: false, groupValue: true, onChanged: null),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Proceed Button
+            // Submit Button
             ElevatedButton(
-              onPressed: _isProcessing || _selectedAmount <= 0 ? null : _processDeposit,
+              onPressed: _isProcessing || _selectedAmount <= 0 ? null : _submitDepositRequest,
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 backgroundColor: Theme.of(context).primaryColor,
@@ -241,9 +231,9 @@ class _AddMoneyScreenState extends State<AddMoneyScreen> {
                       width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
-                  : Text(
-                      'Proceed to Pay ₹${_selectedAmount.toStringAsFixed(2)}',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  : const Text(
+                      'Submit Request',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
             ),
           ],
@@ -252,28 +242,23 @@ class _AddMoneyScreenState extends State<AddMoneyScreen> {
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isTotal = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-              fontSize: isTotal ? 16 : 14,
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-              fontSize: isTotal ? 16 : 14,
-            ),
-          ),
-        ],
-      ),
+  Widget _buildCopyRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+            Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        IconButton(
+          icon: const Icon(Icons.copy, size: 20),
+          onPressed: () => _copyToClipboard(value),
+          color: Theme.of(context).primaryColor,
+        ),
+      ],
     );
   }
 }

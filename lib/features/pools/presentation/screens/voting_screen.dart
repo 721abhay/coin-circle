@@ -47,7 +47,7 @@ class _VotingScreenState extends ConsumerState<VotingScreen> with SingleTickerPr
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/special-distribution-request'),
+        onPressed: () => context.push('/special-distribution/${widget.poolId}'),
         label: const Text('Request Special Distribution'),
         icon: const Icon(Icons.add),
       ),

@@ -39,6 +39,33 @@ class ChatService {
     }
   }
 
+  /// Send a file attachment
+  static Future<void> sendAttachment({
+    required String poolId,
+    required String fileUrl,
+    required String fileName,
+    required String fileType,
+  }) async {
+    try {
+      final userId = _supabase.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      await _supabase.from('pool_messages').insert({
+        'pool_id': poolId,
+        'user_id': userId,
+        'message_type': 'attachment',
+        'content': 'Sent an attachment: $fileName',
+        'metadata': {
+          'file_url': fileUrl,
+          'file_name': fileName,
+          'file_type': fileType,
+        },
+      });
+    } catch (e) {
+      throw Exception('Failed to send attachment: $e');
+    }
+  }
+
   /// Send a system message (automated notifications)
   static Future<void> sendSystemMessage({
     required String poolId,

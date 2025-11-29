@@ -4,6 +4,11 @@ import 'package:intl/intl.dart';
 import '../../../../core/services/chat_service.dart';
 import '../../../../core/config/supabase_config.dart';
 
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/services/document_service.dart';
+
 class PoolChatScreen extends ConsumerStatefulWidget {
   final String poolId;
   final String poolName;
@@ -101,8 +106,14 @@ class _PoolChatScreenState extends ConsumerState<PoolChatScreen> {
       _scrollToBottom();
     } catch (e) {
       if (mounted) {
+        String errorMessage = 'Failed to send message';
+        if (e.toString().contains('row-level security') || e.toString().contains('42501')) {
+          errorMessage = 'You do not have permission to send messages in this pool.';
+        } else {
+          errorMessage = 'Error: ${e.toString().replaceAll('Exception: ', '')}';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error sending message: $e')),
+          SnackBar(content: Text(errorMessage)),
         );
       }
     } finally {
@@ -240,9 +251,7 @@ class _PoolChatScreenState extends ConsumerState<PoolChatScreen> {
           children: [
             IconButton(
               icon: const Icon(Icons.attach_file),
-              onPressed: () {
-                // TODO: Implement file attachment
-              },
+              onPressed: _handleAttachment,
             ),
             Expanded(
               child: TextField(
@@ -294,6 +303,40 @@ class _PoolChatScreenState extends ConsumerState<PoolChatScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleAttachment() async {
+    try {
+      final result = await FilePicker.platform.pickFiles();
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        final fileName = result.files.single.name;
+        
+        final fileExt = fileName.split('.').last;
+        final path = '${widget.poolId}/chat/${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+        
+        await Supabase.instance.client.storage.from('pool_documents').upload(
+          path,
+          file,
+          fileOptions: FileOptions(cacheControl: '3600', upsert: false),
+        );
+        
+        final publicUrl = Supabase.instance.client.storage.from('pool_documents').getPublicUrl(path);
+
+        await ChatService.sendAttachment(
+          poolId: widget.poolId,
+          fileUrl: publicUrl,
+          fileName: fileName,
+          fileType: fileExt,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send attachment: $e')),
+        );
+      }
+    }
   }
 }
 

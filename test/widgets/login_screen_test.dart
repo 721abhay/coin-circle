@@ -81,9 +81,7 @@ void main() {
         ),
       );
 
-      final emailField = find.byType(TextFormField).first;
-      await tester.enterText(emailField, 'test@example.com');
-      
+      await tester.enterText(find.byKey(const Key('email_field')), 'test@example.com');
       expect(find.text('test@example.com'), findsOneWidget);
     });
 
@@ -96,10 +94,16 @@ void main() {
         ),
       );
 
-      final passwordField = find.byType(TextFormField).at(1);
-      await tester.enterText(passwordField, 'password123');
+      // Enter text
+      await tester.enterText(find.byKey(const Key('password_field')), 'password123');
       
-      expect(find.text('password123'), findsOneWidget);
+      // Enter text
+      await tester.enterText(find.byKey(const Key('password_field')), 'password123');
+      await tester.pump();
+
+      // Verify controller has the text (bypassing visual obscurement issues)
+      final formField = tester.widget<TextFormField>(find.byKey(const Key('password_field')));
+      expect(formField.controller!.text, 'password123');
     });
   });
 }

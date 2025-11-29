@@ -132,6 +132,22 @@ class GamificationService {
     }
   }
 
+  // Get reviews for a user
+  static Future<List<Map<String, dynamic>>> getReviews(String userId) async {
+    try {
+      final response = await _supabase
+          .from('reviews')
+          .select('*, reviewer:reviewer_id(full_name, avatar_url)') // Join with profiles to get reviewer details
+          .eq('reviewee_id', userId)
+          .order('created_at', ascending: false);
+      
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      print('Error fetching reviews: $e');
+      return [];
+    }
+  }
+
   // Initialize gamification profile if it doesn't exist
   static Future<void> ensureGamificationProfile() async {
     final userId = _supabase.auth.currentUser?.id;

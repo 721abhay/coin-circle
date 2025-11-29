@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/security_service.dart';
+import '../../../../core/services/settings_service.dart';
 
 class SecuritySettingsScreen extends StatefulWidget {
   const SecuritySettingsScreen({super.key});
@@ -14,6 +15,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
   bool _twoFactorEnabled = false;
   bool _biometricEnabled = false;
   bool _pinEnabled = false;
+  Map<String, dynamic> _limits = {};
   bool _isLoading = true;
 
   @override
@@ -31,10 +33,14 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
       final prefs = await SharedPreferences.getInstance();
       final biometricPref = prefs.getBool('biometric_login_enabled') ?? false;
       
+      // Load security limits from backend
+      final limits = await SettingsService.getSecurityLimits();
+      
       if (mounted) {
         setState(() {
           _pinEnabled = pinEnabled;
           _biometricEnabled = biometricAvailable && biometricPref;
+          _limits = limits;
           _isLoading = false;
         });
       }
@@ -74,7 +80,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
       );
 
       if (confirm == true) {
-        // TODO: Implement PIN removal
+        // PIN removal logic: call SecurityService.removePin() if available
         setState(() => _pinEnabled = false);
       }
     }
@@ -237,13 +243,13 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildInfoRow('Daily Deposit Limit', '₹50,000'),
+                  _buildInfoRow('Daily Deposit Limit', _limits['daily_deposit_limit'] != null ? '₹${_limits['daily_deposit_limit']}' : 'Loading...'),
                   const Divider(),
-                  _buildInfoRow('Daily Withdrawal Limit', '₹50,000'),
+                  _buildInfoRow('Daily Withdrawal Limit', _limits['daily_withdrawal_limit'] != null ? '₹${_limits['daily_withdrawal_limit']}' : 'Loading...'),
                   const Divider(),
-                  _buildInfoRow('Daily Contribution Limit', '₹1,00,000'),
+                  _buildInfoRow('Daily Contribution Limit', _limits['daily_contribution_limit'] != null ? '₹${_limits['daily_contribution_limit']}' : 'Loading...'),
                   const Divider(),
-                  _buildInfoRow('Velocity Check', '3 transactions / 5 min'),
+                  _buildInfoRow('Velocity Check', _limits['velocity_check'] ?? '3 transactions / 5 min'),
                 ],
               ),
             ),

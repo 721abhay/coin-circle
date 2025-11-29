@@ -79,8 +79,8 @@ class _AdminPoolsViewState extends ConsumerState<AdminPoolsView> {
   Widget _buildPoolsGrid() {
     return GridView.builder(
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        childAspectRatio: 1.2,
+        crossAxisCount: 2,
+        childAspectRatio: 0.8,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),

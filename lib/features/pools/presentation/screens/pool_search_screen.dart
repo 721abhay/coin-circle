@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../../../core/services/pool_service.dart';
 
 class PoolSearchScreen extends StatefulWidget {
   const PoolSearchScreen({super.key});
@@ -18,74 +19,39 @@ class _PoolSearchScreenState extends State<PoolSearchScreen> with SingleTickerPr
   RangeValues _contributionRange = const RangeValues(100, 5000);
   int _selectedDuration = 0; // 0 = All
   String _sortBy = 'Popular';
+  
+  List<Map<String, dynamic>> _allPools = [];
+  bool _isLoading = true;
 
   final List<String> _categories = ['All', 'Family', 'Friends', 'Colleagues', 'Community'];
   final List<String> _sortOptions = ['Popular', 'Newest', 'Ending Soon', 'Lowest Amount', 'Highest Amount'];
-
-  // Mock data
-  final List<Map<String, dynamic>> _allPools = [
-    {
-      'id': '1',
-      'name': 'Office Savings Circle',
-      'creator': 'John Doe',
-      'category': 'Colleagues',
-      'contribution': 500.0,
-      'frequency': 'Monthly',
-      'duration': 12,
-      'members': 8,
-      'maxMembers': 12,
-      'trustScore': 4.8,
-      'startDate': DateTime.now().add(const Duration(days: 7)),
-      'description': 'Monthly savings pool for office colleagues',
-    },
-    {
-      'id': '2',
-      'name': 'Family Emergency Fund',
-      'creator': 'Jane Smith',
-      'category': 'Family',
-      'contribution': 1000.0,
-      'frequency': 'Monthly',
-      'duration': 6,
-      'members': 5,
-      'maxMembers': 6,
-      'trustScore': 5.0,
-      'startDate': DateTime.now().add(const Duration(days: 3)),
-      'description': 'Emergency fund for family members',
-    },
-    {
-      'id': '3',
-      'name': 'Friends Vacation Pool',
-      'creator': 'Mike Johnson',
-      'category': 'Friends',
-      'contribution': 200.0,
-      'frequency': 'Weekly',
-      'duration': 24,
-      'members': 10,
-      'maxMembers': 15,
-      'trustScore': 4.5,
-      'startDate': DateTime.now().add(const Duration(days: 14)),
-      'description': 'Save together for a group vacation',
-    },
-    {
-      'id': '4',
-      'name': 'Community Development Fund',
-      'creator': 'Sarah Williams',
-      'category': 'Community',
-      'contribution': 300.0,
-      'frequency': 'Monthly',
-      'duration': 18,
-      'members': 15,
-      'maxMembers': 20,
-      'trustScore': 4.9,
-      'startDate': DateTime.now().add(const Duration(days: 5)),
-      'description': 'Pool for community projects',
-    },
-  ];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _loadPools();
+  }
+
+  Future<void> _loadPools() async {
+    setState(() => _isLoading = true);
+    try {
+      final pools = await PoolService.getPublicPools();
+      if (mounted) {
+        setState(() {
+          _allPools = pools;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading pools: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading pools: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -102,42 +68,66 @@ class _PoolSearchScreenState extends State<PoolSearchScreen> with SingleTickerPr
     if (_searchQuery.isNotEmpty) {
       filtered = filtered.where((pool) =>
         pool['name'].toString().toLowerCase().contains(_searchQuery.toLowerCase()) ||
-        pool['description'].toString().toLowerCase().contains(_searchQuery.toLowerCase())
+        (pool['description'] ?? '').toString().toLowerCase().contains(_searchQuery.toLowerCase())
       ).toList();
     }
 
-    // Category filter
-    if (_selectedCategory != 'All') {
-      filtered = filtered.where((pool) => pool['category'] == _selectedCategory).toList();
+    // Category filter (if category field exists in pool data)
+    if (_selectedCategory != 'All' && filtered.isNotEmpty) {
+      filtered = filtered.where((pool) => 
+        (pool['category'] ?? 'Community') == _selectedCategory
+      ).toList();
     }
 
     // Contribution range filter
     filtered = filtered.where((pool) {
-      final amount = pool['contribution'] as double;
+      final amount = (pool['contribution_amount'] as num?)?.toDouble() ?? 0;
       return amount >= _contributionRange.start && amount <= _contributionRange.end;
     }).toList();
 
     // Duration filter
     if (_selectedDuration > 0) {
-      filtered = filtered.where((pool) => pool['duration'] == _selectedDuration).toList();
+      filtered = filtered.where((pool) => 
+        (pool['total_rounds'] as int?) == _selectedDuration
+      ).toList();
     }
 
     // Sort
     switch (_sortBy) {
       case 'Newest':
-        filtered.sort((a, b) => (b['startDate'] as DateTime).compareTo(a['startDate'] as DateTime));
+        filtered.sort((a, b) {
+          final dateA = DateTime.tryParse(a['created_at'] ?? '') ?? DateTime.now();
+          final dateB = DateTime.tryParse(b['created_at'] ?? '') ?? DateTime.now();
+          return dateB.compareTo(dateA);
+        });
         break;
       case 'Ending Soon':
-        filtered.sort((a, b) => (a['startDate'] as DateTime).compareTo(b['startDate'] as DateTime));
+        filtered.sort((a, b) {
+          final dateA = DateTime.tryParse(a['start_date'] ?? '') ?? DateTime.now();
+          final dateB = DateTime.tryParse(b['start_date'] ?? '') ?? DateTime.now();
+          return dateA.compareTo(dateB);
+        });
         break;
       case 'Lowest Amount':
-        filtered.sort((a, b) => (a['contribution'] as double).compareTo(b['contribution'] as double));
+        filtered.sort((a, b) {
+          final amtA = (a['contribution_amount'] as num?)?.toDouble() ?? 0;
+          final amtB = (b['contribution_amount'] as num?)?.toDouble() ?? 0;
+          return amtA.compareTo(amtB);
+        });
         break;
       case 'Highest Amount':
-        filtered.sort((a, b) => (b['contribution'] as double).compareTo(a['contribution'] as double));
+        filtered.sort((a, b) {
+          final amtA = (a['contribution_amount'] as num?)?.toDouble() ?? 0;
+          final amtB = (b['contribution_amount'] as num?)?.toDouble() ?? 0;
+          return amtB.compareTo(amtA);
+        });
         break;
       default: // Popular
-        filtered.sort((a, b) => (b['trustScore'] as double).compareTo(a['trustScore'] as double));
+        filtered.sort((a, b) {
+          final membersA = (a['current_members'] as num?)?.toInt() ?? 0;
+          final membersB = (b['current_members'] as num?)?.toInt() ?? 0;
+          return membersB.compareTo(membersA);
+        });
     }
 
     return filtered;
@@ -162,14 +152,16 @@ class _PoolSearchScreenState extends State<PoolSearchScreen> with SingleTickerPr
           _buildSearchBar(),
           _buildFilters(),
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildBrowseTab(),
-                _buildRecommendedTab(),
-                _buildTrendingTab(),
-              ],
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildBrowseTab(),
+                      _buildRecommendedTab(),
+                      _buildTrendingTab(),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -267,54 +259,113 @@ class _PoolSearchScreenState extends State<PoolSearchScreen> with SingleTickerPr
 
   Widget _buildBrowseTab() {
     if (_filteredPools.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _loadPools,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.6,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No pools found',
+                    style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Try adjusting your filters or pull to refresh',
+                    style: TextStyle(color: Colors.grey.shade500),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadPools,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _filteredPools.length,
+        itemBuilder: (context, index) {
+          return _PoolCard(pool: _filteredPools[index]);
+        },
+      ),
+    );
+  }
+
+  Widget _buildRecommendedTab() {
+    // Show pools with high member count as "recommended"
+    final recommended = _filteredPools.where((p) {
+      final members = (p['current_members'] as num?)?.toInt() ?? 0;
+      final maxMembers = (p['max_members'] as num?)?.toInt() ?? 1;
+      return members >= (maxMembers * 0.5); // At least 50% full
+    }).take(5).toList();
+
+    if (recommended.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
+            Icon(Icons.recommend, size: 64, color: Colors.grey.shade400),
             const SizedBox(height: 16),
-            Text(
-              'No pools found',
-              style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Try adjusting your filters',
-              style: TextStyle(color: Colors.grey.shade500),
-            ),
+            Text('No recommended pools yet', style: TextStyle(color: Colors.grey.shade600)),
           ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _filteredPools.length,
-      itemBuilder: (context, index) {
-        return _PoolCard(pool: _filteredPools[index]);
-      },
-    );
-  }
-
-  Widget _buildRecommendedTab() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _filteredPools.take(3).length,
-      itemBuilder: (context, index) {
-        return _PoolCard(pool: _filteredPools[index], isRecommended: true);
-      },
+    return RefreshIndicator(
+      onRefresh: _loadPools,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: recommended.length,
+        itemBuilder: (context, index) {
+          return _PoolCard(pool: recommended[index], isRecommended: true);
+        },
+      ),
     );
   }
 
   Widget _buildTrendingTab() {
-    final trending = _filteredPools.where((p) => p['members'] >= 5).toList();
+    // Show pools with most members as "trending"
+    final trending = List<Map<String, dynamic>>.from(_filteredPools)
+      ..sort((a, b) {
+        final membersA = (a['current_members'] as num?)?.toInt() ?? 0;
+        final membersB = (b['current_members'] as num?)?.toInt() ?? 0;
+        return membersB.compareTo(membersA);
+      });
     
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: trending.length,
-      itemBuilder: (context, index) {
-        return _PoolCard(pool: trending[index], isTrending: true);
-      },
+    final topTrending = trending.take(5).toList();
+
+    if (topTrending.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.trending_up, size: 64, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text('No trending pools yet', style: TextStyle(color: Colors.grey.shade600)),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadPools,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: topTrending.length,
+        itemBuilder: (context, index) {
+          return _PoolCard(pool: topTrending[index], isTrending: true);
+        },
+      ),
     );
   }
 
@@ -481,11 +532,18 @@ class _PoolCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final creatorName = pool['creator']?['full_name'] ?? 'Unknown';
+    final contributionAmount = (pool['contribution_amount'] as num?)?.toDouble() ?? 0;
+    final frequency = pool['frequency'] ?? 'monthly';
+    final duration = (pool['total_rounds'] as int?) ?? 12;
+    final currentMembers = (pool['current_members'] as num?)?.toInt() ?? 0;
+    final maxMembers = (pool['max_members'] as num?)?.toInt() ?? 1;
+    final startDate = DateTime.tryParse(pool['start_date'] ?? '') ?? DateTime.now();
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
         onTap: () {
-          // Navigate to pool details
           context.push('/pool-details/${pool['id']}');
         },
         borderRadius: BorderRadius.circular(12),
@@ -498,7 +556,7 @@ class _PoolCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      pool['name'],
+                      pool['name'] ?? 'Unnamed Pool',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -533,7 +591,7 @@ class _PoolCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                pool['description'],
+                pool['description'] ?? 'No description',
                 style: TextStyle(color: Colors.grey.shade600),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -544,14 +602,7 @@ class _PoolCard extends StatelessWidget {
                   Icon(Icons.person, size: 16, color: Colors.grey.shade600),
                   const SizedBox(width: 4),
                   Text(
-                    pool['creator'],
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                  ),
-                  const SizedBox(width: 16),
-                  Icon(Icons.category, size: 16, color: Colors.grey.shade600),
-                  const SizedBox(width: 4),
-                  Text(
-                    pool['category'],
+                    creatorName,
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                 ],
@@ -562,14 +613,14 @@ class _PoolCard extends StatelessWidget {
                   Expanded(
                     child: _InfoChip(
                       icon: Icons.account_balance_wallet,
-                      label: '₹${pool['contribution']} / ${pool['frequency']}',
+                      label: '₹${contributionAmount.toStringAsFixed(0)} / $frequency',
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: _InfoChip(
                       icon: Icons.calendar_today,
-                      label: '${pool['duration']} months',
+                      label: '$duration months',
                     ),
                   ),
                 ],
@@ -579,13 +630,13 @@ class _PoolCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: LinearProgressIndicator(
-                      value: pool['members'] / pool['maxMembers'],
+                      value: currentMembers / maxMembers,
                       backgroundColor: Colors.grey.shade200,
                     ),
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '${pool['members']}/${pool['maxMembers']} members',
+                    '$currentMembers/$maxMembers members',
                     style: const TextStyle(fontSize: 12),
                   ),
                 ],
@@ -594,18 +645,8 @@ class _PoolCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.star, size: 16, color: Colors.amber.shade700),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${pool['trustScore']} Trust Score',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
                   Text(
-                    'Starts ${DateFormat('MMM d').format(pool['startDate'])}',
+                    'Starts ${DateFormat('MMM d').format(startDate)}',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                 ],

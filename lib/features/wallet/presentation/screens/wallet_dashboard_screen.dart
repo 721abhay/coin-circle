@@ -1,10 +1,55 @@
-
 import 'package:coin_circle/features/wallet/presentation/screens/add_money_screen.dart';
 import 'package:coin_circle/features/wallet/presentation/screens/withdraw_funds_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../../../core/services/wallet_service.dart';
 
-class WalletDashboardScreen extends StatelessWidget {
+class WalletDashboardScreen extends StatefulWidget {
   const WalletDashboardScreen({super.key});
+
+  @override
+  State<WalletDashboardScreen> createState() => _WalletDashboardScreenState();
+}
+
+class _WalletDashboardScreenState extends State<WalletDashboardScreen> {
+  bool _isLoading = true;
+  Map<String, dynamic>? _walletData;
+  List<Map<String, dynamic>> _transactions = [];
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final wallet = await WalletService.getWallet();
+      final transactions = await WalletService.getTransactions(limit: 5);
+      
+      if (mounted) {
+        setState(() {
+          _walletData = wallet;
+          _transactions = transactions;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,34 +58,66 @@ class WalletDashboardScreen extends StatelessWidget {
         title: const Text('Wallet'),
         backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadData,
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Balance Section
-            _buildBalanceCard(context),
-            const SizedBox(height: 24),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text('Error: $_error', style: const TextStyle(color: Colors.red)),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadData,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadData,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Balance Section
+                        _buildBalanceCard(context),
+                        const SizedBox(height: 24),
 
-            // Action Buttons
-            _buildActionButtons(context),
-            const SizedBox(height: 32),
+                        // Action Buttons
+                        _buildActionButtons(context),
+                        const SizedBox(height: 32),
 
-            // Transaction History
-            Text(
-              'Recent Transactions',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-            _buildTransactionList(),
-          ],
-        ),
-      ),
+                        // Transaction History
+                        Text(
+                          'Recent Transactions',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTransactionList(),
+                      ],
+                    ),
+                  ),
+                ),
     );
   }
 
   Widget _buildBalanceCard(BuildContext context) {
+    final available = (_walletData?['available_balance'] as num?)?.toDouble() ?? 0.0;
+    final locked = (_walletData?['locked_balance'] as num?)?.toDouble() ?? 0.0;
+    final winnings = (_walletData?['total_winnings'] as num?)?.toDouble() ?? 0.0;
+    
+    final currencyFormatter = NumberFormat.currency(symbol: '₹', decimalDigits: 2, locale: 'en_IN');
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -54,9 +131,9 @@ class WalletDashboardScreen extends StatelessWidget {
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
             const SizedBox(height: 8),
-            const Text(
-              '₹1,250.75',
-              style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
+            Text(
+              currencyFormatter.format(available),
+              style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
             const Divider(),
@@ -64,9 +141,8 @@ class WalletDashboardScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildBalanceDetail('Locked', '₹500.00'),
-                _buildBalanceDetail('Winnings', '₹2,300.00'),
-                _buildBalanceDetail('Pending', '₹150.00'),
+                _buildBalanceDetail('Locked', currencyFormatter.format(locked)),
+                _buildBalanceDetail('Winnings', currencyFormatter.format(winnings)),
               ],
             ),
           ],
@@ -99,11 +175,12 @@ class WalletDashboardScreen extends StatelessWidget {
           child: ElevatedButton.icon(
             icon: const Icon(Icons.add_circle_outline),
             label: const Text('Add Money'),
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const AddMoneyScreen()),
               );
+              _loadData(); // Refresh on return
             },
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -116,11 +193,12 @@ class WalletDashboardScreen extends StatelessWidget {
           child: ElevatedButton.icon(
             icon: const Icon(Icons.remove_circle_outline),
             label: const Text('Withdraw'),
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const WithdrawFundsScreen()),
               );
+              _loadData(); // Refresh on return
             },
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -133,30 +211,101 @@ class WalletDashboardScreen extends StatelessWidget {
   }
 
   Widget _buildTransactionList() {
-    // Dummy data for now
-    final transactions = [
-      {'icon': Icons.arrow_downward, 'color': Colors.green, 'title': 'Deposit from Bank', 'amount': '+ ₹1,000.00', 'date': 'June 28, 2024'},
-      {'icon': Icons.shopping_cart, 'color': Colors.red, 'title': 'Contribution to 'Weekend Pool'', 'amount': '- ₹250.00', 'date': 'June 27, 2024'},
-      {'icon': Icons.card_giftcard, 'color': Colors.green, 'title': 'Winnings from 'Monthly Saver'', 'amount': '+ ₹1,500.00', 'date': 'June 25, 2024'},
-      {'icon': Icons.arrow_upward, 'color': Colors.red, 'title': 'Withdrawal to Bank', 'amount': '- ₹500.00', 'date': 'June 24, 2024'},
-    ];
+    if (_transactions.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text('No transactions yet'),
+        ),
+      );
+    }
 
     return ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: transactions.length,
+      itemCount: _transactions.length,
       separatorBuilder: (context, index) => const Divider(),
       itemBuilder: (context, index) {
-        final tx = transactions[index];
+        final tx = _transactions[index];
+        final type = tx['transaction_type'] as String;
+        final amount = (tx['amount'] as num).toDouble();
+        final date = DateTime.parse(tx['created_at']);
+        final status = tx['status'] as String;
+        
+        IconData icon;
+        Color color;
+        String title;
+        String amountPrefix;
+
+        switch (type) {
+          case 'deposit':
+            icon = Icons.arrow_downward;
+            color = Colors.green;
+            title = 'Deposit';
+            amountPrefix = '+';
+            break;
+          case 'withdrawal':
+            icon = Icons.arrow_upward;
+            color = Colors.red;
+            title = 'Withdrawal';
+            amountPrefix = '-';
+            break;
+          case 'contribution':
+            icon = Icons.shopping_cart;
+            color = Colors.orange;
+            title = 'Pool Contribution';
+            amountPrefix = '-';
+            break;
+          case 'winning':
+            icon = Icons.card_giftcard;
+            color = Colors.purple;
+            title = 'Winnings';
+            amountPrefix = '+';
+            break;
+          default:
+            icon = Icons.receipt;
+            color = Colors.grey;
+            title = 'Transaction';
+            amountPrefix = '';
+        }
+
+        final currencyFormatter = NumberFormat.currency(symbol: '₹', decimalDigits: 2, locale: 'en_IN');
+        final dateFormatter = DateFormat('MMM dd, yyyy HH:mm');
+
         return ListTile(
-          leading: Icon(tx['icon'] as IconData, color: tx['color'] as Color),
-          title: Text(tx['title'] as String),
-          subtitle: Text(tx['date'] as String),
+          leading: CircleAvatar(
+            backgroundColor: color.withOpacity(0.1),
+            child: Icon(icon, color: color),
+          ),
+          title: Text(tx['description'] ?? title),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(dateFormatter.format(date)),
+              if (status != 'completed')
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: status == 'pending' ? Colors.orange.shade100 : Colors.red.shade100,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    status.toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: status == 'pending' ? Colors.orange.shade800 : Colors.red.shade800,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
+          ),
           trailing: Text(
-            tx['amount'] as String,
+            '$amountPrefix ${currencyFormatter.format(amount)}',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: tx['color'] as Color,
+              color: color,
             ),
           ),
           onTap: () {

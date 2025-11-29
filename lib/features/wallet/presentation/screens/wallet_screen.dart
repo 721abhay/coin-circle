@@ -24,12 +24,20 @@ class _WalletScreenState extends State<WalletScreen> {
   Future<void> _loadWalletData() async {
     try {
       final wallet = await WalletService.getWallet();
-      final transactions = await WalletService.getTransactions(limit: 5);
+      final transactions = await WalletService.getTransactions(limit: 20); // Fetch more to get accurate pending
       
+      double pendingAmount = 0.0;
+      for (var t in transactions) {
+        if (t['status'] == 'pending') {
+          pendingAmount += (t['amount'] as num).toDouble();
+        }
+      }
+
       if (mounted) {
         setState(() {
           _wallet = wallet;
-          _transactions = transactions;
+          _transactions = transactions.take(5).toList(); // Show top 5
+          _wallet?['pending_amount'] = pendingAmount; // Store locally for display
           _isLoading = false;
         });
       }
@@ -193,7 +201,7 @@ class _WalletScreenState extends State<WalletScreen> {
           const Divider(height: 24),
           _buildBalanceRow('Locked in Pools', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(_wallet?['locked_balance'] ?? 0.0), Colors.orange, Icons.lock),
           const Divider(height: 24),
-          _buildBalanceRow('Pending Transactions', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(0.0), Colors.blue, Icons.pending), // TODO: Calculate pending
+          _buildBalanceRow('Pending Transactions', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(_wallet?['pending_amount'] ?? 0.0), Colors.blue, Icons.pending),
           const Divider(height: 24),
           _buildBalanceRow('Total Winnings', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(_wallet?['total_winnings'] ?? 0.0), Colors.purple, Icons.emoji_events),
         ],
@@ -607,35 +615,60 @@ class _WalletScreenState extends State<WalletScreen> {
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   TextButton.icon(
-                    onPressed: () {},
+                    onPressed: () {
+                      // Navigate to add bank account screen
+                      // context.push('/settings/bank-accounts/add');
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please go to Settings > Bank Accounts to add a new method.')),
+                      );
+                    },
                     icon: const Icon(Icons.add),
                     label: const Text('Add New'),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-              _buildPaymentMethodCard(
-                'Visa ending in 4242',
-                'Expires 12/25',
-                Icons.credit_card,
-                true,
-                () {},
-              ),
-              const SizedBox(height: 12),
-              _buildPaymentMethodCard(
-                'Chase Bank',
-                'Account •••• 1234',
-                Icons.account_balance,
-                false,
-                () {},
-              ),
-              const SizedBox(height: 12),
-              _buildPaymentMethodCard(
-                'PayPal',
-                'user@example.com',
-                Icons.payment,
-                false,
-                () {},
+              FutureBuilder<List<Map<String, dynamic>>>(
+                future: WalletService.getPaymentMethods(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  
+                  if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  }
+
+                  final accounts = snapshot.data ?? [];
+
+                  if (accounts.isEmpty) {
+                    return Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.credit_card_off, size: 48, color: Colors.grey.shade400),
+                          const SizedBox(height: 16),
+                          const Text('No payment methods added'),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return Column(
+                    children: accounts.map((account) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: _buildPaymentMethodCard(
+                          account['bank_name'] ?? 'Bank Account',
+                          '${account['account_number']}',
+                          Icons.account_balance,
+                          account['is_primary'] ?? false,
+                          () {},
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
               ),
             ],
           ),

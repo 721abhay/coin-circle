@@ -14,6 +14,7 @@ import '../widgets/admin_financials_view.dart';
 import '../widgets/admin_settings_view.dart';
 import '../widgets/admin_tickets_view.dart';
 import 'admin_more_screen.dart';
+import 'admin_deposit_requests_screen.dart';
 
 /// Mobile‑friendly Admin Dashboard
 /// Uses a BottomNavigationBar for navigation (no side bar).
@@ -156,6 +157,17 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
             spacing: 12,
             runSpacing: 12,
             children: [
+              _buildQuickActionButton(
+                'Deposit Requests',
+                Icons.account_balance,
+                Colors.teal,
+                () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AdminDepositRequestsScreen()),
+                  );
+                },
+              ),
               _buildQuickActionButton(
                 'Approve KYC',
                 Icons.verified_user,
