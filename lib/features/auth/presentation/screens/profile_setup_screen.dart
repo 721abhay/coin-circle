@@ -27,6 +27,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final TextEditingController _bioController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _dobController = TextEditingController();
+  DateTime? _selectedDate; // Store the actual date
   String _selectedCountryCode = '+91'; // Default India
 
   // Step 3: Notification Preferences
@@ -156,7 +157,9 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             'phone': '$_selectedCountryCode$phone',
             'bio': _bioController.text.trim(),
             'location': _locationController.text.trim(),
-            'date_of_birth': _dobController.text.trim(),
+            'date_of_birth': _selectedDate != null 
+                ? DateFormat('yyyy-MM-dd').format(_selectedDate!) 
+                : null, // Database format: YYYY-MM-DD
           })
           .eq('id', userId);
 
@@ -513,7 +516,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 lastDate: DateTime.now(),
               );
               if (date != null) {
-                _dobController.text = DateFormat('dd/MM/yyyy').format(date);
+                setState(() {
+                  _selectedDate = date;
+                  _dobController.text = DateFormat('dd/MM/yyyy').format(date); // Display format
+                });
               }
             },
             readOnly: true,
