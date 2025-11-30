@@ -230,7 +230,7 @@ class PoolService {
         'user_id': user.id,
         'role': 'member',
         'status': 'pending', // Explicitly pending
-        'joined_at': DateTime.now().toIso8601String(),
+        'join_date': DateTime.now().toIso8601String(),
       });
     } catch (e) {
       // If direct insert fails (RLS), try RPC but warn user
