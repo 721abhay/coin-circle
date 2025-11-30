@@ -176,7 +176,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> with SingleTicker
         };
       });
     } catch (e) {
-      print('Error in _loadLeaderboardData: $e');
+      debugPrint('Error in _loadLeaderboardData: $e');
       return [];
     }
   }

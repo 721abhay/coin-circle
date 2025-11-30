@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/models/personal_details_model.dart';
 
@@ -29,7 +30,7 @@ class PersonalDetailsService {
 
       return PersonalDetails.fromJson(data);
     } catch (e) {
-      print('Error fetching personal details: $e');
+      debugPrint('Error fetching personal details: $e');
       rethrow;
     }
   }
@@ -56,7 +57,7 @@ class PersonalDetailsService {
           .update(updates)
           .eq('id', userId);
     } catch (e) {
-      print('Error updating contact details: $e');
+      debugPrint('Error updating contact details: $e');
       rethrow;
     }
   }
@@ -83,7 +84,7 @@ class PersonalDetailsService {
           .update(updates)
           .eq('id', userId);
     } catch (e) {
-      print('Error updating identity details: $e');
+      debugPrint('Error updating identity details: $e');
       rethrow;
     }
   }
@@ -108,7 +109,7 @@ class PersonalDetailsService {
           .update(updates)
           .eq('id', userId);
     } catch (e) {
-      print('Error updating income details: $e');
+      debugPrint('Error updating income details: $e');
       rethrow;
     }
   }
@@ -120,7 +121,7 @@ class PersonalDetailsService {
       // For now, just update the phone number
       await updateContactDetails(phoneNumber: phoneNumber);
     } catch (e) {
-      print('Error sending phone OTP: $e');
+      debugPrint('Error sending phone OTP: $e');
       rethrow;
     }
   }
@@ -141,7 +142,7 @@ class PersonalDetailsService {
           })
           .eq('id', userId);
     } catch (e) {
-      print('Error verifying phone OTP: $e');
+      debugPrint('Error verifying phone OTP: $e');
       rethrow;
     }
   }
@@ -154,7 +155,7 @@ class PersonalDetailsService {
         UserAttributes(email: email),
       );
     } catch (e) {
-      print('Error sending email verification: $e');
+      debugPrint('Error sending email verification: $e');
       rethrow;
     }
   }

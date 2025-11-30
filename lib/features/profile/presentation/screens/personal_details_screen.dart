@@ -91,7 +91,7 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> with Sing
         _controller.forward();
       }
     } catch (e) {
-      print('Error loading profile: $e');
+      debugPrint('Error loading profile: $e');
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(

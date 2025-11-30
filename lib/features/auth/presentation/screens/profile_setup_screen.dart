@@ -156,7 +156,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             'phone': '$_selectedCountryCode$phone',
             'bio': _bioController.text.trim(),
             'location': _locationController.text.trim(),
-            'dob': _dobController.text.trim(),
+            'date_of_birth': _dobController.text.trim(),
           })
           .eq('id', userId);
 

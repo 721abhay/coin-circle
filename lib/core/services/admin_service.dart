@@ -19,7 +19,7 @@ class AdminService {
 
       return response['is_admin'] == true;
     } catch (e) {
-      print('Error checking admin status: $e');
+      debugPrint('Error checking admin status: $e');
       return false;
     }
   }
@@ -45,7 +45,7 @@ class AdminService {
       final response = await query;
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching all users: $e');
+      debugPrint('Error fetching all users: $e');
       return [];
     }
   }
@@ -58,7 +58,7 @@ class AdminService {
       });
       return response as Map<String, dynamic>?;
     } catch (e) {
-      print('Error fetching user details: $e');
+      debugPrint('Error fetching user details: $e');
       return null;
     }
   }
@@ -71,7 +71,7 @@ class AdminService {
         'p_reason': reason,
       });
     } catch (e) {
-      print('Error suspending user: $e');
+      debugPrint('Error suspending user: $e');
       rethrow;
     }
   }
@@ -83,7 +83,7 @@ class AdminService {
         'p_user_id': userId,
       });
     } catch (e) {
-      print('Error unsuspending user: $e');
+      debugPrint('Error unsuspending user: $e');
       rethrow;
     }
   }
@@ -111,7 +111,7 @@ class AdminService {
       final response = await query;
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching all pools: $e');
+      debugPrint('Error fetching all pools: $e');
       return [];
     }
   }
@@ -130,7 +130,7 @@ class AdminService {
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching withdrawal requests: $e');
+      debugPrint('Error fetching withdrawal requests: $e');
       return [];
     }
   }
@@ -144,7 +144,7 @@ class AdminService {
         'p_rejection_reason': notes ?? '',
       });
     } catch (e) {
-      print('Error approving withdrawal: $e');
+      debugPrint('Error approving withdrawal: $e');
       rethrow;
     }
   }
@@ -158,7 +158,7 @@ class AdminService {
         'p_rejection_reason': reason,
       });
     } catch (e) {
-      print('Error rejecting withdrawal: $e');
+      debugPrint('Error rejecting withdrawal: $e');
       rethrow;
     }
   }
@@ -171,14 +171,14 @@ class AdminService {
           .select('''
             *,
             pool:pools(name),
-            complainant:profiles!complainant_id(full_name),
-            respondent:profiles!respondent_id(full_name)
+            creator:profiles!creator_id(full_name, email),
+            reported_user:profiles!reported_user_id(full_name, email)
           ''')
           .order('created_at', ascending: false);
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching disputes: $e');
+      debugPrint('Error fetching disputes: $e');
       return [];
     }
   }
@@ -191,7 +191,7 @@ class AdminService {
         'p_reason': reason,
       });
     } catch (e) {
-      print('Error force closing pool: $e');
+      debugPrint('Error force closing pool: $e');
       rethrow;
     }
   }
@@ -236,7 +236,7 @@ class AdminService {
         'total_volume': totalVolume,
       };
     } catch (e) {
-      print('Error fetching platform stats: $e');
+      debugPrint('Error fetching platform stats: $e');
       return {
         'total_users': 0,
         'total_pools': 0,
@@ -252,7 +252,7 @@ class AdminService {
       final response = await _client.rpc('get_admin_stats');
       return Map<String, dynamic>.from(response);
     } catch (e) {
-      print('Error fetching admin stats: $e');
+      debugPrint('Error fetching admin stats: $e');
       return {};
     }
   }
@@ -263,7 +263,7 @@ class AdminService {
       final response = await _client.rpc('get_revenue_chart_data');
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching revenue data: $e');
+      debugPrint('Error fetching revenue data: $e');
       return [];
     }
   }
@@ -278,7 +278,7 @@ class AdminService {
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching deposit requests: $e');
+      debugPrint('Error fetching deposit requests: $e');
       return [];
     }
   }
@@ -310,7 +310,7 @@ class AdminService {
       });
 
     } catch (e) {
-      print('Error approving deposit: $e');
+      debugPrint('Error approving deposit: $e');
       rethrow;
     }
   }
@@ -326,7 +326,7 @@ class AdminService {
           })
           .eq('id', requestId);
     } catch (e) {
-      print('Error rejecting deposit: $e');
+      debugPrint('Error rejecting deposit: $e');
       rethrow;
     }
   }
@@ -358,7 +358,7 @@ class AdminService {
       activities.sort((a, b) => (b['time'] as String).compareTo(a['time'] as String));
       return activities.take(limit).toList();
     } catch (e) {
-      print('Error fetching activities: $e');
+      debugPrint('Error fetching activities: $e');
       return [];
     }
   }

@@ -57,7 +57,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }
     } catch (e) {
       // If check fails, still load dashboard but log error
-      print('Error checking PIN: $e');
+      debugPrint('Error checking PIN: $e');
       _pinCheckDone = true;
       _loadDashboardData();
     }
@@ -76,7 +76,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final showBiometric = false; // biometricEnabled && biometricAvailable;
     
     // Debug print
-    print('🔐 Biometric enabled: $biometricEnabled, available: $biometricAvailable, show: $showBiometric');
+    debugPrint('🔐 Biometric enabled: $biometricEnabled, available: $biometricAvailable, show: $showBiometric');
     
     if (!mounted) return;
     
@@ -134,7 +134,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: OutlinedButton.icon(
                     onPressed: () async {
                       try {
-                        print('🔐 Attempting biometric authentication...');
+                        debugPrint('🔐 Attempting biometric authentication...');
                         
                         // Show loading
                         ScaffoldMessenger.of(dialogContext).showSnackBar(
@@ -148,7 +148,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           reason: 'Authenticate to access your account',
                         );
                         
-                        print('🔐 Authentication result: $authenticated');
+                        debugPrint('🔐 Authentication result: $authenticated');
                         
                         if (authenticated) {
                           await SecurityService.resetFailedPinAttempts();
@@ -173,7 +173,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           }
                         }
                       } catch (e) {
-                        print('🔐 Biometric error: $e');
+                        debugPrint('🔐 Biometric error: $e');
                         if (mounted) {
                           ScaffoldMessenger.of(dialogContext).showSnackBar(
                             SnackBar(
@@ -382,7 +382,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               .single();
           userName = profile['full_name'] ?? 'User';
         } catch (e) {
-          print('Error fetching user name: $e');
+          debugPrint('Error fetching user name: $e');
         }
       }
       
@@ -426,7 +426,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         });
       }
     } catch (e) {
-      print('Error loading dashboard: $e');
+      debugPrint('Error loading dashboard: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }

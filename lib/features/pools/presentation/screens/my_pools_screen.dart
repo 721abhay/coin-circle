@@ -136,7 +136,7 @@ class _PoolListState extends State<_PoolList> {
     setState(() => _isLoading = true);
     try {
       final pools = await PoolService.getUserPools();
-      print('📊 Loaded ${pools.length} pools from backend'); // Debug log
+      debugPrint('📊 Loaded ${pools.length} pools from backend'); // Debug log
       
       if (mounted) {
         setState(() {
@@ -145,7 +145,7 @@ class _PoolListState extends State<_PoolList> {
             final poolStatus = (pool['status'] ?? 'pending').toString().toLowerCase();
             final targetStatus = widget.status.toLowerCase();
             
-            print('Checking pool: ${pool['name']} ($poolStatus) vs Target: $targetStatus'); // Debug log
+            debugPrint('Checking pool: ${pool['name']} ($poolStatus) vs Target: $targetStatus'); // Debug log
             
             // Handle 'drafts' vs 'draft' mismatch
             if (targetStatus == 'drafts' || targetStatus == 'draft') {
@@ -156,12 +156,12 @@ class _PoolListState extends State<_PoolList> {
             return poolStatus == targetStatus;
           }).toList();
           
-          print('✅ Filtered to ${_pools.length} pools for tab ${widget.status}'); // Debug log
+          debugPrint('✅ Filtered to ${_pools.length} pools for tab ${widget.status}'); // Debug log
           _isLoading = false;
         });
       }
     } catch (e) {
-      print('❌ Error loading pools: $e'); // Debug log
+      debugPrint('❌ Error loading pools: $e'); // Debug log
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -251,10 +251,12 @@ class _PoolListState extends State<_PoolList> {
                 nextDraw: pool['start_date'] != null 
                     ? DateFormat('MMM d').format(DateTime.parse(pool['start_date']).add(const Duration(days: 30)))
                     : 'TBD',
-                amount: contributionAmount * maxMembers,
+                totalPoolAmount: contributionAmount * maxMembers,
+                contributionAmount: contributionAmount,
                 cycle: '${pool['current_round'] ?? 1} of ${pool['total_rounds'] ?? 12}',
                 progress: _calculateProgress(pool),
                 onTap: () => context.push('/pool-details/${pool['id']}'),
+                onPay: () => context.push('/payment', extra: {'poolId': pool['id'], 'amount': contributionAmount.toDouble()}),
               );
             },
           );
@@ -268,19 +270,23 @@ class _ActivePoolCard extends StatelessWidget {
   final String name;
   final String status;
   final String nextDraw;
-  final int amount;
+  final int totalPoolAmount;
+  final int contributionAmount;
   final String cycle;
   final double progress;
   final VoidCallback onTap;
+  final VoidCallback? onPay;
 
   const _ActivePoolCard({
     required this.name,
     required this.status,
     required this.nextDraw,
-    required this.amount,
+    required this.totalPoolAmount,
+    required this.contributionAmount,
     required this.cycle,
     required this.progress,
     required this.onTap,
+    this.onPay,
   });
 
   @override
@@ -340,8 +346,8 @@ class _ActivePoolCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   _buildInfoItem(Icons.calendar_today, 'Next Draw', nextDraw),
-                  _buildInfoItem(Icons.attach_money, 'Total Pool', '₹${amount * 10}'), // Assuming 10 members
-                  _buildInfoItem(Icons.pie_chart, 'Your Odds', '10%'),
+                  _buildInfoItem(Icons.attach_money, 'Total Pool', '₹$totalPoolAmount'),
+                  _buildInfoItem(Icons.pie_chart, 'Contribution', '₹$contributionAmount'),
                 ],
               ),
               const SizedBox(height: 16),
@@ -364,10 +370,10 @@ class _ActivePoolCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  if (status != 'Paid')
+                  if (status != 'Paid' && onPay != null)
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () => context.push('/payment', extra: {'poolId': '1', 'amount': amount.toDouble()}),
+                        onPressed: onPay,
                         child: const Text('Pay Now'),
                       ),
                     ),

@@ -83,7 +83,7 @@ class _StreakTrackingScreenState extends State<StreakTrackingScreen> {
         }
       }
     } catch (e) {
-      print('Error loading streak data: $e');
+      debugPrint('Error loading streak data: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading data: $e')),

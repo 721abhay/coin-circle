@@ -17,6 +17,7 @@ class _EditPersonalDetailsScreenState extends State<EditPersonalDetailsScreen> {
   bool _isSaving = false;
 
   // Controllers
+  final _fullNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
   final _cityController = TextEditingController();
@@ -39,6 +40,7 @@ class _EditPersonalDetailsScreenState extends State<EditPersonalDetailsScreen> {
 
   @override
   void dispose() {
+    _fullNameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
     _cityController.dispose();
@@ -66,6 +68,7 @@ class _EditPersonalDetailsScreenState extends State<EditPersonalDetailsScreen> {
 
       if (mounted) {
         setState(() {
+          _fullNameController.text = profile['full_name'] ?? '';
           _phoneController.text = profile['phone'] ?? '';
           _addressController.text = profile['address'] ?? '';
           _cityController.text = profile['city'] ?? '';
@@ -104,7 +107,15 @@ class _EditPersonalDetailsScreenState extends State<EditPersonalDetailsScreen> {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) throw Exception('User not logged in');
 
+      final fullName = _fullNameController.text.trim();
+      final nameParts = fullName.split(' ');
+      final firstName = nameParts.isNotEmpty ? nameParts.first : '';
+      final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
       await Supabase.instance.client.from('profiles').update({
+        'full_name': fullName,
+        'first_name': firstName,
+        'last_name': lastName,
         'phone': _phoneController.text.trim(),
         'address': _addressController.text.trim(),
         'city': _cityController.text.trim(),
@@ -188,6 +199,24 @@ class _EditPersonalDetailsScreenState extends State<EditPersonalDetailsScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            // Basic Information
+            _buildSectionHeader('Basic Information'),
+            TextFormField(
+              controller: _fullNameController,
+              decoration: const InputDecoration(
+                labelText: 'Full Name',
+                hintText: 'John Doe',
+                prefixIcon: Icon(Icons.person),
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter your full name';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            
             // Contact Information
             _buildSectionHeader('Contact Information'),
             TextFormField(

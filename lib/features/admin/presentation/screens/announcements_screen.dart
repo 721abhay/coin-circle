@@ -77,10 +77,18 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
             ),
           ),
           const SizedBox(height: 24),
+          const SizedBox(height: 24),
           const Text('History', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
-          _buildHistoryItem('Welcome to the Pool!', '2 days ago', 28),
-          _buildHistoryItem('Payment Reminder', '5 days ago', 25),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Text(
+                'No announcements yet',
+                style: TextStyle(color: Colors.grey.shade500),
+              ),
+            ),
+          ),
         ],
       ),
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/services/wallet_service.dart';
+import '../../../../core/config/app_config.dart';
 
 class AddMoneyScreen extends StatefulWidget {
   const AddMoneyScreen({super.key});
@@ -18,13 +19,11 @@ class _AddMoneyScreenState extends State<AddMoneyScreen> {
 
   final List<double> _quickAmounts = [100, 500, 1000, 2000, 5000];
   
-  // ⚠️ IMPORTANT: UPDATE THESE WITH YOUR REAL BANK DETAILS BEFORE LAUNCH! ⚠️
-  // Admin Bank Details - Users will transfer money to these accounts
-  // TODO: Replace with your actual UPI ID, Bank Name, Account Number, and IFSC Code
-  final String _adminUpiId = 'admin@coincircle';  // ← UPDATE THIS
-  final String _adminBankName = 'HDFC Bank';      // ← UPDATE THIS
-  final String _adminAccountNo = '50100123456789'; // ← UPDATE THIS
-  final String _adminIfsc = 'HDFC0001234';        // ← UPDATE THIS
+  // Admin Bank Details from AppConfig
+  final String _adminUpiId = AppConfig.adminUpiId;
+  final String _adminBankName = AppConfig.adminBankName;
+  final String _adminAccountNo = AppConfig.adminAccountNo;
+  final String _adminIfsc = AppConfig.adminIfsc;
 
   @override
   void dispose() {

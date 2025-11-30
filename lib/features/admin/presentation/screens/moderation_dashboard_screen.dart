@@ -8,49 +8,28 @@ class ModerationDashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Moderation Tools')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _buildSection('Chat Moderation'),
-          _buildActionTile(
-            context,
-            'Mute Members',
-            'Restrict chat access',
-            Icons.mic_off,
-            () {},
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.security, size: 80, color: Colors.grey.shade300),
+              const SizedBox(height: 24),
+              const Text(
+                'Moderation Tools Coming Soon',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Advanced chat moderation, user banning, and reporting features will be available in the next major update.',
+                style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
-          _buildActionTile(
-            context,
-            'Delete Messages',
-            'Remove inappropriate content',
-            Icons.delete_outline,
-            () {},
-          ),
-          _buildActionTile(
-            context,
-            'Pin Message',
-            'Highlight important info',
-            Icons.push_pin_outlined,
-            () {},
-          ),
-
-          const SizedBox(height: 24),
-          _buildSection('User Actions'),
-          _buildActionTile(
-            context,
-            'Ban User',
-            'Remove and block from pool',
-            Icons.block,
-            () {},
-          ),
-          _buildActionTile(
-            context,
-            'Report to Support',
-            'Escalate serious issues',
-            Icons.report_problem_outlined,
-            () {},
-          ),
-        ],
+        ),
       ),
     );
   }

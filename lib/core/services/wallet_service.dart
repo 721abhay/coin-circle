@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'chat_service.dart';
 import 'security_service.dart';
+import 'platform_revenue_service.dart';
 
 class WalletService {
   static final SupabaseClient _client = Supabase.instance.client;
@@ -27,7 +29,7 @@ class WalletService {
       }
 
       // Create new wallet if doesn't exist
-      print('Wallet not found, creating new wallet for user $_userId');
+      debugPrint('Wallet not found, creating new wallet for user $_userId');
       final newWallet = await _client
           .from('wallets')
           .insert({
@@ -41,7 +43,7 @@ class WalletService {
 
       return newWallet;
     } catch (e) {
-      print('Error fetching/creating wallet: $e');
+      debugPrint('Error fetching/creating wallet: $e');
       rethrow;
     }
   }
@@ -69,10 +71,13 @@ class WalletService {
           .range(offset, offset + limit - 1);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching transactions: $e');
+      debugPrint('Error fetching transactions: $e');
       rethrow;
     }
   }
+
+  // Simple client-side rate limiter
+  static DateTime? _lastDepositRequestTime;
 
   /// Request a manual deposit (User sends money, Admin approves)
   static Future<void> requestDeposit({
@@ -82,7 +87,30 @@ class WalletService {
   }) async {
     if (_userId == null) throw Exception('User not logged in');
 
+    // 🛑 KYC CHECK: Must be verified to add money
+    final isVerified = await SecurityService.checkKYCStatus();
+    if (!isVerified) {
+      throw Exception('KYC Verification Required. Please complete your profile verification (Government ID) to add money.');
+    }
+
+    // Client-side rate limit (prevent button spamming)
+    if (_lastDepositRequestTime != null && 
+        DateTime.now().difference(_lastDepositRequestTime!) < const Duration(seconds: 30)) {
+      throw Exception('Please wait 30 seconds before submitting another request.');
+    }
+
     try {
+      // Server-side rate limit check (if available in SecurityService)
+      try {
+        final rateLimitOk = await SecurityService.checkRateLimit('deposit_request');
+        if (!rateLimitOk) {
+          throw Exception('Rate limit exceeded. Please try again later.');
+        }
+      } catch (e) {
+        // Ignore if SecurityService fails, fallback to client-side check
+        debugPrint('SecurityService rate limit check failed: $e');
+      }
+
       await _client.from('deposit_requests').insert({
         'user_id': _userId,
         'amount': amount,
@@ -91,10 +119,12 @@ class WalletService {
         'status': 'pending',
       });
       
+      _lastDepositRequestTime = DateTime.now();
+      
       // Log for audit
-      print('Deposit request submitted: $amount, Ref: $transactionReference');
+      debugPrint('Deposit request submitted: $amount, Ref: $transactionReference');
     } catch (e) {
-      print('Error requesting deposit: $e');
+      debugPrint('Error requesting deposit: $e');
       rethrow;
     }
   }
@@ -157,7 +187,7 @@ class WalletService {
         'device_info': await SecurityService.getDeviceFingerprint(),
       });
     } catch (e) {
-      print('Error depositing funds: $e');
+      debugPrint('Error depositing funds: $e');
       // Fallback: Try direct update if RPC fails
       try {
         final wallet = await getWallet();
@@ -166,11 +196,12 @@ class WalletService {
           'available_balance': currentBalance + amount,
         }).eq('user_id', _userId!);
       } catch (e2) {
-        print('Fallback balance update failed: $e2');
+        debugPrint('Fallback balance update failed: $e2');
         rethrow;
       }
     }
   }
+
 
   /// Withdraw funds with enhanced security
   static Future<void> withdraw({
@@ -184,6 +215,12 @@ class WalletService {
 
     // Security checks
     await SecurityService.validateSession();
+
+    // 🛑 KYC CHECK: Must be verified to withdraw
+    final isVerified = await SecurityService.checkKYCStatus();
+    if (!isVerified) {
+      throw Exception('KYC Verification Required. Please complete your profile verification (Government ID) to withdraw funds.');
+    }
     
     // Rate limiting
     final rateLimitOk = await SecurityService.checkRateLimit('withdrawal');
@@ -235,6 +272,14 @@ class WalletService {
     if (wallet == null) throw Exception('Wallet not found');
     
     final double available = (wallet['available_balance'] as num).toDouble();
+    final double winningBalance = (wallet['winning_balance'] as num?)?.toDouble() ?? 0.0;
+    
+    // Check if user has enough winning balance (only winnings are withdrawable)
+    if (winningBalance < amount) {
+      throw Exception('Insufficient withdrawable winnings. You can only withdraw your winnings (₹${winningBalance.toStringAsFixed(2)}).');
+    }
+    
+    // Also check total available just in case (though winning <= available usually)
     if (available < amount) {
       throw Exception('Insufficient funds');
     }
@@ -257,6 +302,14 @@ class WalletService {
         'p_amount': amount,
       });
       
+      // Manually decrement winning balance since RPC might not handle it yet
+      // Or we should update the RPC. For now, let's do a direct update for winning_balance
+      // Note: decrement_wallet_balance only updates available_balance. We need to update winning_balance too.
+      
+      await _client.from('wallets').update({
+        'winning_balance': winningBalance - amount,
+      }).eq('user_id', _userId!);
+      
       // Log security event
       await SecurityService.logSecurityEvent('withdrawal', {
         'amount': amount,
@@ -264,12 +317,14 @@ class WalletService {
         'device_info': await SecurityService.getDeviceFingerprint(),
       });
     } catch (e) {
-      print('Error withdrawing funds: $e');
+      debugPrint('Error withdrawing funds: $e');
       // Fallback
       try {
-        await _client.from('wallets').update({
-          'available_balance': available - amount,
-        }).eq('user_id', _userId!);
+        // We might need to revert both if one fails, but for now let's assume RPC works or fails atomically-ish
+        // If RPC succeeded but winning_balance update failed, we are in a weird state.
+        // Ideally we should use a stored procedure for both.
+        // For now, let's just rethrow.
+        rethrow;
       } catch (e2) {
         rethrow;
       }
@@ -315,11 +370,63 @@ class WalletService {
     if (wallet == null) throw Exception('Wallet not found');
     
     final double available = (wallet['available_balance'] as num).toDouble();
-    if (available < amount) {
-      throw Exception('Insufficient funds');
+    final double winningBalance = (wallet['winning_balance'] as num?)?.toDouble() ?? 0.0;
+    
+    // Get pool details to calculate late fee
+    final pool = await _client.from('pools').select().eq('id', poolId).single();
+    final gracePeriod = (pool['late_grace_period'] as int?) ?? 3;
+    
+    // Calculate due date based on pool frequency and start date
+    final startDate = DateTime.parse(pool['start_date']);
+    final frequency = pool['frequency'] as String;
+    DateTime dueDate;
+    
+    switch (frequency.toLowerCase()) {
+      case 'weekly':
+        dueDate = startDate.add(Duration(days: 7 * round));
+        break;
+      case 'bi-weekly':
+        dueDate = startDate.add(Duration(days: 14 * round));
+        break;
+      case 'monthly':
+      default:
+        dueDate = DateTime(startDate.year, startDate.month + round, startDate.day);
+        break;
+    }
+    
+    // Add grace period
+    dueDate = dueDate.add(Duration(days: gracePeriod));
+    
+    // Calculate days late
+    final now = DateTime.now();
+    final daysLate = now.difference(dueDate).inDays;
+    
+    // Calculate late fee using PlatformRevenueService
+    double lateFee = 0;
+    if (daysLate > 0) {
+      lateFee = PlatformRevenueService.calculateLateFee(daysLate);
+    }
+    
+    // Check if user has enough balance for contribution + late fee
+    final totalRequired = amount + lateFee;
+    if (available < totalRequired) {
+      if (lateFee > 0) {
+        throw Exception('Insufficient funds. Required: ₹${totalRequired.toStringAsFixed(2)} (₹${amount.toStringAsFixed(2)} contribution + ₹${lateFee.toStringAsFixed(2)} late fee)');
+      } else {
+        throw Exception('Insufficient funds');
+      }
+    }
+
+    // Calculate how much to deduct from winning balance (spend non-winning funds first)
+    final double nonWinningFunds = available - winningBalance;
+    double deductionFromWinning = 0.0;
+    
+    if (totalRequired > nonWinningFunds) {
+      deductionFromWinning = totalRequired - nonWinningFunds;
     }
 
     try {
+      // Insert contribution transaction
       await _client.from('transactions').insert({
         'user_id': _userId,
         'pool_id': poolId,
@@ -328,17 +435,35 @@ class WalletService {
         'currency': 'INR',
         'status': 'completed',
         'payment_method': 'wallet',
-        'description': 'Contribution for Round $round',
-        'metadata': {'round': round},
+        'description': lateFee > 0 
+            ? 'Contribution for Round $round (Late: $daysLate days, Fee: ₹${lateFee.toStringAsFixed(2)})'
+            : 'Contribution for Round $round',
+        'metadata': {
+          'round': round,
+          'days_late': daysLate,
+          'late_fee': lateFee,
+        },
       });
 
-      // Update wallet: Deduct from available, Add to locked
+      // Update wallet: Deduct contribution + late fee from available, Add contribution to locked
+      // Also update winning_balance if we dipped into it
       final currentLocked = (wallet['locked_balance'] as num).toDouble();
       
       await _client.from('wallets').update({
-        'available_balance': available - amount,
-        'locked_balance': currentLocked + amount,
+        'available_balance': available - totalRequired,
+        'locked_balance': currentLocked + amount, // Only contribution goes to locked, not late fee
+        'winning_balance': winningBalance - deductionFromWinning,
       }).eq('user_id', _userId!);
+
+      // Record late fee to platform revenue if applicable
+      if (lateFee > 0) {
+        await PlatformRevenueService.recordLateFee(
+          userId: _userId!,
+          poolId: poolId,
+          amount: lateFee,
+          daysLate: daysLate,
+        );
+      }
 
       // Send chat notification
       try {
@@ -351,7 +476,7 @@ class WalletService {
           amount: amount,
         );
       } catch (e) {
-        print('Failed to send chat notification: $e');
+        debugPrint('Failed to send chat notification: $e');
       }
       
       // Log security event
@@ -359,10 +484,12 @@ class WalletService {
         'amount': amount,
         'pool_id': poolId,
         'round': round,
+        'late_fee': lateFee,
+        'days_late': daysLate,
         'device_info': await SecurityService.getDeviceFingerprint(),
       });
     } catch (e) {
-      print('Error contributing to pool: $e');
+      debugPrint('Error contributing to pool: $e');
       rethrow;
     }
   }
@@ -404,10 +531,12 @@ class WalletService {
       final wallet = await getWallet();
       final currentBalance = (wallet['available_balance'] as num).toDouble();
       final currentWinnings = (wallet['total_winnings'] as num).toDouble();
+      final currentWinningBalance = (wallet['winning_balance'] as num?)?.toDouble() ?? 0.0;
 
       await _client.from('wallets').update({
         'available_balance': currentBalance + netAmount,
         'total_winnings': currentWinnings + amount, // Track gross winnings
+        'winning_balance': currentWinningBalance + netAmount, // Add to withdrawable balance
       }).eq('user_id', _userId!);
 
       // Log security event
@@ -429,7 +558,7 @@ class WalletService {
         'quarter': tdsResult['quarter'],
       };
     } catch (e) {
-      print('Error crediting winnings: $e');
+      debugPrint('Error crediting winnings: $e');
       rethrow;
     }
   }
@@ -446,8 +575,46 @@ class WalletService {
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching payment methods: $e');
+      debugPrint('Error fetching payment methods: $e');
       return [];
+    }
+  }
+
+  /// Deduct amount from wallet (for fees)
+  static Future<void> deductFromWallet({
+    required double amount,
+    String? description,
+  }) async {
+    if (_userId == null) throw Exception('User not logged in');
+
+    // First check balance
+    final wallet = await getWallet();
+    if (wallet == null) throw Exception('Wallet not found');
+    
+    final double available = (wallet['available_balance'] as num).toDouble();
+    if (available < amount) {
+      throw Exception('Insufficient funds');
+    }
+
+    try {
+      // Update wallet: Deduct from available
+      await _client.from('wallets').update({
+        'available_balance': available - amount,
+      }).eq('user_id', _userId!);
+
+      // Log transaction
+      await _client.from('transactions').insert({
+        'user_id': _userId,
+        'transaction_type': 'fee',
+        'amount': amount,
+        'currency': 'INR',
+        'status': 'completed',
+        'payment_method': 'wallet',
+        'description': description ?? 'Platform Fee Deduction',
+      });
+    } catch (e) {
+      debugPrint('Error deducting from wallet: $e');
+      rethrow;
     }
   }
 }

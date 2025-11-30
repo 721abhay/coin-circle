@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/services/pool_service.dart';
 import '../../../../core/services/wallet_service.dart';
+import '../../../../core/services/platform_revenue_service.dart';
 
 class JoinPoolScreen extends StatefulWidget {
   const JoinPoolScreen({super.key});
@@ -615,20 +617,15 @@ class _PoolPreviewSheet extends StatelessWidget {
     );
   }
 
-  // Calculate joining fee based on contribution amount
-  double _calculateJoiningFee(double contributionAmount) {
-    if (contributionAmount < 1000) {
-      return 30.0;
-    } else if (contributionAmount < 5000) {
-      return 50.0;
-    } else {
-      return 80.0;
-    }
+  // Get joining fee from pool (fixed ₹20 by default)
+  Future<double> _getJoiningFee() async {
+    final joiningFee = (pool['joining_fee'] as num?)?.toDouble() ?? 20.0;
+    return joiningFee;
   }
 
-  void _showJoinConfirmation(BuildContext context) {
+  void _showJoinConfirmation(BuildContext context) async {
     final contributionAmount = (pool['contribution_amount'] as num).toDouble();
-    final joiningFee = _calculateJoiningFee(contributionAmount);
+    final joiningFee = await _getJoiningFee();
     final totalAmount = joiningFee + contributionAmount;
     
     showDialog(
@@ -737,7 +734,7 @@ class _PoolPreviewSheet extends StatelessWidget {
     if (!context.mounted) return;
     
     final contributionAmount = (pool['contribution_amount'] as num).toDouble();
-    final joiningFee = _calculateJoiningFee(contributionAmount);
+    final joiningFee = await _getJoiningFee();
     final totalAmount = joiningFee + contributionAmount;
     final poolId = pool['id'] as String;
     final inviteCode = pool['invite_code'] ?? '';
@@ -814,11 +811,23 @@ class _PoolPreviewSheet extends StatelessWidget {
         return;
       }
 
-      // Process payment - deduct total amount from wallet and create transaction
+      // Import PlatformRevenueService
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not logged in');
+
+      // 1. Deduct joining fee and record to platform revenue
+      await WalletService.deductFromWallet(amount: joiningFee);
+      await PlatformRevenueService.recordJoiningFee(
+        userId: userId,
+        poolId: poolId,
+        amount: joiningFee,
+      );
+
+      // 2. Make first contribution
       await WalletService.contributeToPool(
         poolId: poolId,
-        amount: totalAmount,
-        round: 0, // 0 indicates joining fee + first contribution
+        amount: contributionAmount,
+        round: 1, // First round
       );
 
       if (context.mounted) {

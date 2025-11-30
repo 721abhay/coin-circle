@@ -14,32 +14,33 @@ class ChatService {
   final SupabaseClient _client = Supabase.instance.client;
 
   Future<List<ChatMessage>> fetchMessages(String poolId) async {
-    final response = await _client
-        .from('pool_messages')
-        .select()
-        .eq('pool_id', poolId)
-        .order('created_at', ascending: true)
-        .execute();
-    if (response.error != null) {
-      throw response.error!;
+    try {
+      final data = await _client
+          .from('pool_messages')
+          .select()
+          .eq('pool_id', poolId)
+          .order('created_at', ascending: true);
+      
+      return (data as List<dynamic>).map((e) => ChatMessage(
+        id: e['id'],
+        userId: e['user_id'],
+        content: e['content'] ?? '',
+        createdAt: DateTime.parse(e['created_at']),
+      )).toList();
+    } catch (e) {
+      throw Exception('Failed to fetch messages: $e');
     }
-    final data = response.data as List<dynamic>;
-    return data.map((e) => ChatMessage(
-      id: e['id'],
-      userId: e['user_id'],
-      content: e['content'] ?? '',
-      createdAt: DateTime.parse(e['created_at']),
-    )).toList();
   }
 
   Future<void> sendMessage(String poolId, String userId, String content) async {
-    final response = await _client.from('pool_messages').insert({
-      'pool_id': poolId,
-      'user_id': userId,
-      'content': content,
-    }).execute();
-    if (response.error != null) {
-      throw response.error!;
+    try {
+      await _client.from('pool_messages').insert({
+        'pool_id': poolId,
+        'user_id': userId,
+        'content': content,
+      });
+    } catch (e) {
+      throw Exception('Failed to send message: $e');
     }
   }
 }

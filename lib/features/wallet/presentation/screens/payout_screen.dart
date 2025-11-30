@@ -49,7 +49,7 @@ class _PayoutScreenState extends State<PayoutScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         // Don't show error snackbar here to avoid clutter, just log or silent fail
-        print('Error loading bank accounts: $e');
+        debugPrint('Error loading bank accounts: $e');
       }
     }
   }

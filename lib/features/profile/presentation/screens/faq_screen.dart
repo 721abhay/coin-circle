@@ -48,7 +48,7 @@ class _FaqScreenState extends State<FaqScreen> {
         )).toList();
       }
     } catch (e) {
-      print('Error loading FAQs: $e');
+      debugPrint('Error loading FAQs: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

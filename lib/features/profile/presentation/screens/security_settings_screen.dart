@@ -149,47 +149,22 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
 
   Future<void> _toggle2FA(bool value) async {
     if (value) {
-      // Show 2FA setup dialog
+      // Show Coming Soon dialog
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Enable 2FA'),
-          content: const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Two-factor authentication adds an extra layer of security.'),
-              SizedBox(height: 16),
-              Text('Choose your preferred method:'),
-            ],
-          ),
+          title: const Text('Coming Soon'),
+          content: const Text('Two-factor authentication (2FA) will be available in the next update.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                setState(() => _twoFactorEnabled = true);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('2FA enabled via SMS')),
-                );
-              },
-              child: const Text('SMS'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                setState(() => _twoFactorEnabled = true);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('2FA enabled via Email')),
-                );
-              },
-              child: const Text('Email'),
+              child: const Text('OK'),
             ),
           ],
         ),
       );
+      // Reset switch to off
+      setState(() => _twoFactorEnabled = false);
     } else {
       setState(() => _twoFactorEnabled = false);
     }

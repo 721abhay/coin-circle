@@ -38,7 +38,7 @@ class _AdminTicketsViewState extends ConsumerState<AdminTicketsView> {
         });
       }
     } catch (e) {
-      print('Error loading tickets: $e');
+      debugPrint('Error loading tickets: $e');
       if (mounted) {
         setState(() {
           _tickets = [];

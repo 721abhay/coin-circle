@@ -73,7 +73,7 @@ class _ChallengesScreenState extends State<ChallengesScreen> with SingleTickerPr
         });
       }
     } catch (e) {
-      print('Error loading challenges: $e');
+      debugPrint('Error loading challenges: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

@@ -13,12 +13,12 @@ void main() async {
   // Initialize Supabase
   try {
     await SupabaseConfig.initialize();
-    print('✅ Supabase initialized successfully');
+    debugPrint('✅ Supabase initialized successfully');
     // Test database setup
     await testDatabaseSetup();
   } catch (e) {
-    print('❌ Error initializing Supabase: $e');
-    print('⚠️  Please create a .env file with your Supabase credentials');
+    debugPrint('❌ Error initializing Supabase: $e');
+    debugPrint('⚠️  Please create a .env file with your Supabase credentials');
   }
   runApp(const ProviderScope(child: CoinCircleApp()));
 }

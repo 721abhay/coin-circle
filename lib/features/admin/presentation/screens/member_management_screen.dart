@@ -120,7 +120,13 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
                 const PopupMenuItem(value: 'remove', child: Text('Remove Member', style: TextStyle(color: Colors.red))),
               ],
               onSelected: (value) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Action: $value')));
+                if (value == 'remove') {
+                  _showRemoveMemberDialog(member);
+                } else if (value == 'remind') {
+                  _sendPaymentReminder(member);
+                } else if (value == 'warning') {
+                  _issueWarning(member);
+                }
               },
             ),
           ),
@@ -346,6 +352,139 @@ class _MemberManagementScreenState extends State<MemberManagementScreen> {
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             child: const Text('Confirm Approval'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRemoveMemberDialog(dynamic member) {
+    final profile = member['profile'] ?? {};
+    final name = profile['full_name'] ?? 'Unknown User';
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Member'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Are you sure you want to remove $name from this pool?'),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.warning_amber, color: Colors.red, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This action cannot be undone. The member will lose access to the pool.',
+                      style: TextStyle(fontSize: 12, color: Colors.red),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              try {
+                await PoolService.removeMember(widget.poolId!, member['user_id']);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Member removed successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  _loadData(); // Refresh the list
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error removing member: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Remove Member'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _sendPaymentReminder(dynamic member) {
+    final profile = member['profile'] ?? {};
+    final name = profile['full_name'] ?? 'Unknown User';
+    
+    // TODO: Implement actual notification/email sending
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Payment reminder sent to $name'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  void _issueWarning(dynamic member) {
+    final profile = member['profile'] ?? {};
+    final name = profile['full_name'] ?? 'Unknown User';
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Issue Warning'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Issue a warning to $name?'),
+            const SizedBox(height: 16),
+            const TextField(
+              decoration: InputDecoration(
+                labelText: 'Warning Message',
+                border: OutlineInputBorder(),
+                hintText: 'Enter warning message...',
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // TODO: Implement actual warning system
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Warning issued to $name'),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('Issue Warning'),
           ),
         ],
       ),

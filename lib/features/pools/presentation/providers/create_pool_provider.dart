@@ -14,12 +14,11 @@ class CreatePoolState {
   final int duration;
   final int maxMembers;
   final bool isPrivate;
-  final int lateGracePeriod;
+  final int paymentDay; // Day of month for payment (1-28)
   final double lateFee;
   final int autoRemovalMissedPayments;
   final String winnerSelectionMethod;
   final double emergencyFund;
-  final bool allowEarlyClosure;
   final bool enableChat;
   final bool requireIdVerification;
   final DateTime? joiningDeadline;
@@ -34,12 +33,11 @@ class CreatePoolState {
     this.duration = 10,
     this.maxMembers = 10,
     this.isPrivate = true,
-    this.lateGracePeriod = 3,
+    this.paymentDay = 1, // Default to 1st of month
     this.lateFee = 5.0,
     this.autoRemovalMissedPayments = 2,
     this.winnerSelectionMethod = 'Random Draw',
     this.emergencyFund = 0.0,
-    this.allowEarlyClosure = false,
     this.enableChat = true,
     this.requireIdVerification = false,
     this.joiningDeadline,
@@ -55,12 +53,11 @@ class CreatePoolState {
     int? duration,
     int? maxMembers,
     bool? isPrivate,
-    int? lateGracePeriod,
+    int? paymentDay,
     double? lateFee,
     int? autoRemovalMissedPayments,
     String? winnerSelectionMethod,
     double? emergencyFund,
-    bool? allowEarlyClosure,
     bool? enableChat,
     bool? requireIdVerification,
     DateTime? joiningDeadline,
@@ -75,12 +72,11 @@ class CreatePoolState {
       duration: duration ?? this.duration,
       maxMembers: maxMembers ?? this.maxMembers,
       isPrivate: isPrivate ?? this.isPrivate,
-      lateGracePeriod: lateGracePeriod ?? this.lateGracePeriod,
+      paymentDay: paymentDay ?? this.paymentDay,
       lateFee: lateFee ?? this.lateFee,
       autoRemovalMissedPayments: autoRemovalMissedPayments ?? this.autoRemovalMissedPayments,
       winnerSelectionMethod: winnerSelectionMethod ?? this.winnerSelectionMethod,
       emergencyFund: emergencyFund ?? this.emergencyFund,
-      allowEarlyClosure: allowEarlyClosure ?? this.allowEarlyClosure,
       enableChat: enableChat ?? this.enableChat,
       requireIdVerification: requireIdVerification ?? this.requireIdVerification,
       joiningDeadline: joiningDeadline ?? this.joiningDeadline,
@@ -100,12 +96,11 @@ class CreatePoolNotifier extends StateNotifier<CreatePoolState> {
   void updateDuration(int duration) => state = state.copyWith(duration: duration);
   void updateMaxMembers(int maxMembers) => state = state.copyWith(maxMembers: maxMembers);
   void updatePrivacy(bool isPrivate) => state = state.copyWith(isPrivate: isPrivate);
-  void updateLateGracePeriod(int days) => state = state.copyWith(lateGracePeriod: days);
+  void updatePaymentDay(int day) => state = state.copyWith(paymentDay: day);
   void updateLateFee(double fee) => state = state.copyWith(lateFee: fee);
   void updateAutoRemoval(int payments) => state = state.copyWith(autoRemovalMissedPayments: payments);
   void updateWinnerSelection(String method) => state = state.copyWith(winnerSelectionMethod: method);
   void updateEmergencyFund(double percent) => state = state.copyWith(emergencyFund: percent);
-  void updateEarlyClosure(bool allow) => state = state.copyWith(allowEarlyClosure: allow);
   void updateEnableChat(bool enable) => state = state.copyWith(enableChat: enable);
   void updateIdVerification(bool require) => state = state.copyWith(requireIdVerification: require);
   void updateJoiningDeadline(DateTime date) => state = state.copyWith(joiningDeadline: date);

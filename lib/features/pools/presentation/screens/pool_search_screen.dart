@@ -44,7 +44,7 @@ class _PoolSearchScreenState extends State<PoolSearchScreen> with SingleTickerPr
         });
       }
     } catch (e) {
-      print('Error loading pools: $e');
+      debugPrint('Error loading pools: $e');
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(

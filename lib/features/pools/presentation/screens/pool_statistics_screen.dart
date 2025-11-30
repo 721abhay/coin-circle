@@ -182,6 +182,9 @@ class _PoolStatisticsScreenState extends State<PoolStatisticsScreen> {
   }
 
   Widget _buildPaymentRateChart() {
+    final onTimeRate = _stats['on_time_payment_rate'] ?? 100.0;
+    final lateRate = 100.0 - onTimeRate;
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -214,8 +217,8 @@ class _PoolStatisticsScreenState extends State<PoolStatisticsScreen> {
               PieChartData(
                 sections: [
                   PieChartSectionData(
-                    value: 92.5,
-                    title: '92.5%',
+                    value: onTimeRate,
+                    title: '${onTimeRate.toStringAsFixed(1)}%',
                     color: Colors.green,
                     radius: 80,
                     titleStyle: const TextStyle(
@@ -223,16 +226,17 @@ class _PoolStatisticsScreenState extends State<PoolStatisticsScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  PieChartSectionData(
-                    value: 7.5,
-                    title: '7.5%',
-                    color: Colors.orange,
-                    radius: 80,
-                    titleStyle: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
+                  if (lateRate > 0)
+                    PieChartSectionData(
+                      value: lateRate,
+                      title: '${lateRate.toStringAsFixed(1)}%',
+                      color: Colors.orange,
+                      radius: 80,
+                      titleStyle: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
                 ],
                 sectionsSpace: 2,
                 centerSpaceRadius: 40,
@@ -244,8 +248,10 @@ class _PoolStatisticsScreenState extends State<PoolStatisticsScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _buildLegendItem('On-Time', Colors.green),
-              const SizedBox(width: 24),
-              _buildLegendItem('Late', Colors.orange),
+              if (lateRate > 0) ...[
+                const SizedBox(width: 24),
+                _buildLegendItem('Late', Colors.orange),
+              ],
             ],
           ),
         ],

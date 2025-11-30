@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Notification Service
@@ -35,7 +36,7 @@ class NotificationService {
       final response = await orderedQuery;
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching notifications: $e');
+      debugPrint('Error fetching notifications: $e');
       return [];
     }
   }
@@ -54,7 +55,7 @@ class NotificationService {
 
       return response;
     } catch (e) {
-      print('Error getting unread count: $e');
+      debugPrint('Error getting unread count: $e');
       return 0;
     }
   }
@@ -67,7 +68,7 @@ class NotificationService {
           .update({'is_read': true, 'read_at': DateTime.now().toIso8601String()})
           .eq('id', notificationId);
     } catch (e) {
-      print('Error marking notification as read: $e');
+      debugPrint('Error marking notification as read: $e');
       rethrow;
     }
   }
@@ -84,7 +85,7 @@ class NotificationService {
           .eq('user_id', userId)
           .eq('is_read', false);
     } catch (e) {
-      print('Error marking all as read: $e');
+      debugPrint('Error marking all as read: $e');
       rethrow;
     }
   }
@@ -94,7 +95,7 @@ class NotificationService {
     try {
       await _client.from('notifications').delete().eq('id', notificationId);
     } catch (e) {
-      print('Error deleting notification: $e');
+      debugPrint('Error deleting notification: $e');
       rethrow;
     }
   }
@@ -118,7 +119,7 @@ class NotificationService {
         'created_at': DateTime.now().toIso8601String(),
       });
     } catch (e) {
-      print('Error creating notification: $e');
+      debugPrint('Error creating notification: $e');
       rethrow;
     }
   }
@@ -154,7 +155,7 @@ class NotificationService {
 
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching notifications by type: $e');
+      debugPrint('Error fetching notifications by type: $e');
       return [];
     }
   }
@@ -171,8 +172,74 @@ class NotificationService {
           .eq('user_id', userId)
           .eq('is_read', true);
     } catch (e) {
-      print('Error deleting read notifications: $e');
+      debugPrint('Error deleting read notifications: $e');
       rethrow;
     }
+  }
+
+  /// Get notification preferences for current user
+  static Future<Map<String, bool>> getNotificationPreferences() async {
+    try {
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) {
+        return _getDefaultPreferences();
+      }
+
+      final response = await _client
+          .from('notification_preferences')
+          .select()
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (response == null) {
+        return _getDefaultPreferences();
+      }
+
+      return {
+        'payment_reminders': response['payment_reminders'] ?? true,
+        'draw_announcements': response['draw_announcements'] ?? true,
+        'pool_updates': response['pool_updates'] ?? true,
+        'member_activities': response['member_activities'] ?? true,
+        'system_messages': response['system_messages'] ?? true,
+      };
+    } catch (e) {
+      debugPrint('Error getting notification preferences: $e');
+      return _getDefaultPreferences();
+    }
+  }
+
+  /// Update notification preferences for current user
+  static Future<void> updateNotificationPreferences(
+      Map<String, bool> preferences) async {
+    try {
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) {
+        throw Exception('User not logged in');
+      }
+
+      await _client.from('notification_preferences').upsert({
+        'user_id': userId,
+        'payment_reminders': preferences['payment_reminders'] ?? true,
+        'draw_announcements': preferences['draw_announcements'] ?? true,
+        'pool_updates': preferences['pool_updates'] ?? true,
+        'member_activities': preferences['member_activities'] ?? true,
+        'system_messages': preferences['system_messages'] ?? true,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Error updating notification preferences: $e');
+      rethrow;
+    }
+  }
+
+  /// Get default notification preferences
+  static Map<String, bool> _getDefaultPreferences() {
+    return {
+      'payment_reminders': true,
+      'draw_announcements': true,
+      'pool_updates': true,
+      'member_activities': true,
+      'system_messages': true,
+    };
   }
 }

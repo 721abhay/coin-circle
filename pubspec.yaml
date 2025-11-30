@@ -55,6 +55,7 @@ dependencies:
   geolocator: ^10.1.0
   local_auth: ^2.1.8
   file_picker: ^10.3.7
+  razorpay_flutter: ^1.4.0
 
 dev_dependencies:
   flutter_test:

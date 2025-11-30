@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 
@@ -16,7 +17,7 @@ class ProfileService {
           .single();
       return response;
     } catch (e) {
-      print('Error fetching profile: $e');
+      debugPrint('Error fetching profile: $e');
       return null;
     }
   }
@@ -30,7 +31,7 @@ class ProfileService {
         'profile_visibility': visibility,
       }).eq('id', user.id);
     } catch (e) {
-      print('Error updating profile visibility: $e');
+      debugPrint('Error updating profile visibility: $e');
       // Fallback to metadata if column doesn't exist
       await _client.auth.updateUser(
         UserAttributes(data: {'profile_visibility': visibility}),

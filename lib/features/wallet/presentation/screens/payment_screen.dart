@@ -22,11 +22,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
   Map<String, dynamic>? _pool;
   int _currentRound = 1;
   bool _isLoading = true;
+  double _walletBalance = 0.0;
 
   @override
   void initState() {
     super.initState();
     _loadPoolDetails();
+    _loadWalletBalance();
   }
 
   Future<void> _loadPoolDetails() async {
@@ -48,6 +50,21 @@ class _PaymentScreenState extends State<PaymentScreen> {
       }
     }
   }
+
+  Future<void> _loadWalletBalance() async {
+    try {
+      final wallet = await WalletService.getWallet();
+      if (mounted) {
+        setState(() {
+          _walletBalance = (wallet['available_balance'] as num).toDouble();
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading wallet: $e');
+    }
+  }
+
+
 
   void _calculateCurrentRound() {
     if (_pool == null) return;
@@ -189,40 +206,78 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   Widget _buildPaymentMethod(int index, String title, String subtitle, IconData icon) {
+    // Only show Wallet Balance
+    if (index != 0) return const SizedBox.shrink();
+
     final isSelected = _selectedMethod == index;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: isSelected ? 2 : 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: isSelected
-            ? BorderSide(color: Theme.of(context).primaryColor, width: 2)
-            : BorderSide(color: Colors.grey.shade200),
-      ),
-      child: InkWell(
-        onTap: () => setState(() => _selectedMethod = index),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              Icon(icon, size: 32, color: Colors.grey.shade700),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    Text(subtitle, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                  ],
-                ),
+    final balance = _walletBalance;
+    final isInsufficient = balance < widget.amount;
+    
+    return Column(
+      children: [
+        Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          elevation: isSelected ? 2 : 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: isSelected
+                ? BorderSide(color: Theme.of(context).primaryColor, width: 2)
+                : BorderSide(color: Colors.grey.shade200),
+          ),
+          child: InkWell(
+            onTap: () => setState(() => _selectedMethod = index),
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  Icon(icon, size: 32, color: Colors.grey.shade700),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text('Available: ₹${balance.toStringAsFixed(2)}', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  if (isSelected)
+                    Icon(Icons.check_circle, color: Theme.of(context).primaryColor),
+                ],
               ),
-              if (isSelected)
-                Icon(Icons.check_circle, color: Theme.of(context).primaryColor),
-            ],
+            ),
           ),
         ),
-      ),
+        if (isInsufficient)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.red.shade200),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.red),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Insufficient Balance. Please add money to your wallet.',
+                    style: TextStyle(color: Colors.red.shade800, fontSize: 12),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                     // Navigate to wallet or show add money dialog
+                     context.push('/wallet'); 
+                  },
+                  child: const Text('Add Money'),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,6 +15,26 @@ class SecurityService {
   
   static void setSessionVerified(bool verified) {
     _sessionVerified = verified;
+  }
+
+  // KYC Verification Check
+  static Future<bool> checkKYCStatus() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return false;
+
+    try {
+      final response = await _client
+          .from('profiles')
+          .select('is_verified')
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (response == null) return false;
+      return response['is_verified'] == true;
+    } catch (e) {
+      debugPrint('KYC check error: $e');
+      return false;
+    }
   }
 
   // Transaction PIN Management
@@ -94,7 +115,7 @@ class SecurityService {
         ),
       );
     } catch (e) {
-      print('Biometric authentication error: $e');
+      debugPrint('Biometric authentication error: $e');
       return false;
     }
   }
@@ -115,7 +136,7 @@ class SecurityService {
 
     // In production, send via SMS/Email
     // For now, return it for testing
-    print('Withdrawal OTP: $otp');
+    debugPrint('Withdrawal OTP: $otp');
     return otp;
   }
 
@@ -307,7 +328,7 @@ class SecurityService {
       
       return result as bool;
     } catch (e) {
-      print('Rate limit check error: $e');
+      debugPrint('Rate limit check error: $e');
       // Fail open - allow request if check fails
       return true;
     }
@@ -345,7 +366,7 @@ class SecurityService {
         'metadata': metadata ?? {},
       });
     } catch (e) {
-      print('Location tracking error: $e');
+      debugPrint('Location tracking error: $e');
       // Don't fail the operation if location tracking fails
     }
   }
@@ -367,7 +388,7 @@ class SecurityService {
 
       return Map<String, dynamic>.from(result as Map);
     } catch (e) {
-      print('TDS calculation error: $e');
+      debugPrint('TDS calculation error: $e');
       rethrow;
     }
   }
@@ -384,7 +405,7 @@ class SecurityService {
 
       return List<Map<String, dynamic>>.from(result as List);
     } catch (e) {
-      print('Multiple account detection error: $e');
+      debugPrint('Multiple account detection error: $e');
       return [];
     }
   }
@@ -401,7 +422,7 @@ class SecurityService {
 
       return result != null;
     } catch (e) {
-      print('IP whitelist check error: $e');
+      debugPrint('IP whitelist check error: $e');
       return false;
     }
   }
@@ -424,7 +445,7 @@ class SecurityService {
       final result = await query.order('created_at', ascending: false);
       return List<Map<String, dynamic>>.from(result);
     } catch (e) {
-      print('Error fetching TDS records: $e');
+      debugPrint('Error fetching TDS records: $e');
       return [];
     }
   }
@@ -444,7 +465,7 @@ class SecurityService {
 
       return List<Map<String, dynamic>>.from(result);
     } catch (e) {
-      print('Error fetching location history: $e');
+      debugPrint('Error fetching location history: $e');
       return [];
     }
   }
@@ -494,7 +515,7 @@ class SecurityService {
 
       return false;
     } catch (e) {
-      print('Suspicious location check error: $e');
+      debugPrint('Suspicious location check error: $e');
       return false;
     }
   }

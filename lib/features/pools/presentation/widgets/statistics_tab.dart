@@ -1,4 +1,4 @@
-﻿import 'package:fl_chart/fl_chart.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -34,7 +34,7 @@ class _StatisticsTabState extends State<StatisticsTab> {
         });
       }
     } catch (e) {
-      print('Error loading stats: $e');
+      debugPrint('Error loading stats: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -119,7 +119,7 @@ class _StatisticsTabState extends State<StatisticsTab> {
       children: [
         _buildCard('Completion', '${completion.toStringAsFixed(1)}%', Icons.pie_chart, Colors.blue),
         _buildCard('On-Time Rate', '${onTimeRate.toStringAsFixed(1)}%', Icons.timer, Colors.green),
-        _buildCard('Total Collected', 'â‚¹${collected.toStringAsFixed(0)}', Icons.attach_money, Colors.amber),
+        _buildCard('Total Collected', '₹${collected.toStringAsFixed(0)}', Icons.attach_money, Colors.amber),
         _buildCard('Member Rating', '4.8/5', Icons.star, Colors.purple),
       ],
     );

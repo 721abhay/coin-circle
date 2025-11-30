@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/services/admin_service.dart';
 import '../../../../core/services/wallet_management_service.dart';
 
@@ -156,7 +157,7 @@ class _AdminFinancialsViewState extends ConsumerState<AdminFinancialsView> {
 
   Future<List<Map<String, dynamic>>> _fetchRecentTransactions() async {
     try {
-      final response = await WalletManagementService.client
+      final response = await Supabase.instance.client
           .from('transactions')
           .select('*, user:profiles(full_name)')
           .eq('status', 'completed')
@@ -165,7 +166,7 @@ class _AdminFinancialsViewState extends ConsumerState<AdminFinancialsView> {
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching transactions: $e');
+      debugPrint('Error fetching transactions: $e');
       return [];
     }
   }

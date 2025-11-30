@@ -56,7 +56,7 @@ class _BadgeListScreenState extends State<BadgeListScreen> {
         });
       }
     } catch (e) {
-      print('Error loading badges: $e');
+      debugPrint('Error loading badges: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

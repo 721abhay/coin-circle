@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class VotingService {
@@ -54,7 +55,7 @@ class VotingService {
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       // Fallback to empty list if RPC missing, to avoid runtime crash during dev
-      print('Error fetching active votes: $e');
+      debugPrint('Error fetching active votes: $e');
       return [];
     }
   }

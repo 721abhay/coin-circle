@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/services/wallet_management_service.dart';
 import '../../../../core/services/pool_service.dart';
 
@@ -109,12 +110,76 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         'totalContributed': totalContributed,
       };
     } catch (e) {
-      print('Error calculating metrics: $e');
+      debugPrint('Error calculating metrics: $e');
       return {
         'trustScore': 0,
         'onTimeRate': 0,
         'totalContributed': 0.0,
       };
+    }
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    // Show warning first
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Profile Picture'),
+        content: const Text('Please upload a clear photo of your face. This is mandatory for identity verification.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Select Photo')),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 800, maxHeight: 800);
+    if (image == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      final bytes = await image.readAsBytes();
+      final fileExt = image.path.split('.').last;
+      final fileName = '${user.id}_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      final filePath = fileName;
+
+      await Supabase.instance.client.storage
+          .from('avatars')
+          .uploadBinary(filePath, bytes, fileOptions: FileOptions(contentType: 'image/$fileExt'));
+
+      // Get Public URL
+      final imageUrl = Supabase.instance.client.storage
+          .from('avatars')
+          .getPublicUrl(filePath);
+
+      // Update Profile
+      await Supabase.instance.client
+          .from('profiles')
+          .update({'avatar_url': imageUrl})
+          .eq('id', user.id);
+
+      await _loadProfileData(); // Refresh UI
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile picture updated!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading image: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -130,7 +195,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
-            onPressed: () => _showEditProfileDialog(context),
+            onPressed: () async {
+              final result = await context.push('/profile/edit-personal-details');
+              if (result == true) {
+                _loadProfileData();
+              }
+            },
           ),
           IconButton(
             icon: const Icon(Icons.settings),
@@ -216,20 +286,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           children: [
             CircleAvatar(
               radius: 50,
-              backgroundImage: avatarUrl != null
-                  ? NetworkImage(avatarUrl)
-                  : const NetworkImage('https://i.pravatar.cc/150?img=12'),
+              backgroundColor: Colors.grey.shade200,
+              backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                  ? NetworkImage(avatarUrl.startsWith('http') 
+                      ? avatarUrl 
+                      : 'https://htwchvjmnqjccxshzdrw.supabase.co/storage/v1/object/public/avatars/$avatarUrl')
+                  : null,
+              child: (avatarUrl == null || avatarUrl.isEmpty)
+                  ? Icon(Icons.person, size: 60, color: Colors.grey.shade400)
+                  : null,
             ),
             Positioned(
               bottom: 0,
               right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  shape: BoxShape.circle,
+              child: GestureDetector(
+                onTap: _pickAndUploadImage,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
                 ),
-                child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
               ),
             ),
           ],
@@ -405,7 +484,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             children: [
               _buildMenuItem(context, 'Verify Identity (KYC)', Icons.verified_user, () => context.push('/kyc-submission')),
               const Divider(height: 1, indent: 56),
-              _buildMenuItem(context, 'Edit Profile', Icons.edit, () => _showEditProfileDialog(context)),
+              _buildMenuItem(context, 'Edit Profile', Icons.edit, () async {
+                final result = await context.push('/profile/edit-personal-details');
+                if (result == true) {
+                  _loadProfileData();
+                }
+              }),
               const Divider(height: 1, indent: 56),
               _buildMenuItem(context, 'My Created Pools', Icons.dashboard, () => context.push('/my-pools')),
               const Divider(height: 1, indent: 56),
@@ -487,65 +571,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  void _showEditProfileDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Profile'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const TextField(
-                decoration: InputDecoration(
-                  labelText: 'Full Name',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const TextField(
-                decoration: InputDecoration(
-                  labelText: 'Email',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const TextField(
-                decoration: InputDecoration(
-                  labelText: 'Phone Number',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const TextField(
-                decoration: InputDecoration(
-                  labelText: 'Bio (Optional)',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Profile updated successfully')),
-              );
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -558,11 +583,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              context.go('/login');
+              await Supabase.instance.client.auth.signOut();
+              if (context.mounted) context.go('/login');
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             child: const Text('Log Out'),
           ),
         ],

@@ -117,7 +117,7 @@ class _TutorialScreenState extends State<TutorialScreen> {
         }).toList();
       }
     } catch (e) {
-      print('Error loading tutorials: $e');
+      debugPrint('Error loading tutorials: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

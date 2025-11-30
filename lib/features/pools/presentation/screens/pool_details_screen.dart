@@ -111,13 +111,21 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Sing
                             ],
                           ),
                         ),
+                        const PopupMenuItem(
+                          value: 'winner_draw',
+                          child: Row(
+                            children: [
+                              Icon(Icons.casino, size: 20),
+                              SizedBox(width: 8),
+                              Text('Draw Winner'),
+                            ],
+                          ),
+                        ),
                       ],
                       const PopupMenuItem(value: 'edit', child: Text('Edit Pool')),
                       const PopupMenuItem(value: 'mute', child: Text('Mute Notifications')),
                       const PopupMenuItem(value: 'leave', child: Text('Leave Pool')),
                       const PopupMenuItem(value: 'report', child: Text('Report Issue')),
-                      const PopupMenuItem(value: 'demo_draw', child: Text('Simulate Draw')),
-                      const PopupMenuItem(value: 'demo_vote', child: Text('View Vote Request')),
                     ];
                   },
                   onSelected: (value) {
@@ -125,10 +133,8 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Sing
                       context.push('/creator-dashboard/${widget.poolId}');
                     } else if (value == 'members') {
                       context.push('/member-management/${widget.poolId}');
-                    } else if (value == 'demo_draw') {
+                    } else if (value == 'winner_draw') {
                       context.push('/winner-selection/${widget.poolId}');
-                    } else if (value == 'demo_vote') {
-                      context.push('/voting/${widget.poolId}');
                     }
                   },
                 ),
@@ -213,7 +219,7 @@ class _OverviewTabState extends State<_OverviewTab> {
         });
       }
     } catch (e) {
-      print('Error loading overview data: $e');
+      debugPrint('Error loading overview data: $e');
     }
   }
 
@@ -426,6 +432,26 @@ class _OverviewTabState extends State<_OverviewTab> {
   }
 
   Widget _buildPaymentSection(BuildContext context) {
+    // Calculate real due date from pool schedule
+    final startDate = DateTime.parse(widget.pool!['start_date']);
+    final now = DateTime.now();
+    final daysSinceStart = now.difference(startDate).inDays;
+    final currentRound = ((daysSinceStart / 30).floor() + 1).clamp(1, widget.pool!['total_rounds'] as int);
+    final nextDueDate = startDate.add(Duration(days: 30 * currentRound));
+    final daysUntilDue = nextDueDate.difference(now).inDays;
+    
+    // Check if user has paid for current cycle
+    final hasPaid = _userTransactions.where((t) => 
+      t['type'] == 'contribution' && 
+      t['created_at'] != null &&
+      DateTime.parse(t['created_at']).isAfter(startDate.add(Duration(days: 30 * (currentRound - 1))))
+    ).isNotEmpty;
+    
+    if (hasPaid) {
+      // Don't show payment section if already paid
+      return const SizedBox.shrink();
+    }
+    
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -442,7 +468,13 @@ class _OverviewTabState extends State<_OverviewTab> {
               const SizedBox(width: 8),
               const Text('Payment Due', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange, fontSize: 16)),
               const Spacer(),
-              const Text('Due in 2 days', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              Text(
+                daysUntilDue > 0 ? 'Due in $daysUntilDue days' : daysUntilDue == 0 ? 'Due today' : '${-daysUntilDue} days overdue',
+                style: TextStyle(
+                  color: daysUntilDue < 0 ? Colors.red : Colors.orange,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -584,17 +616,26 @@ class _OverviewTabState extends State<_OverviewTab> {
         const SizedBox(height: 16),
         // Show only next 3 cycles or recent ones
         ...List.generate(totalRounds > 3 ? 3 : totalRounds, (i) {
-          final dueDate = startDate.add(Duration(days: i * 30));
-          final isPast = dueDate.isBefore(now);
+          final cycleStartDate = startDate.add(Duration(days: i * 30));
+          final cycleEndDate = startDate.add(Duration(days: (i + 1) * 30));
+          final isPast = cycleEndDate.isBefore(now);
           
-          // Check if user has paid for this cycle (simplified logic: count contributions)
-          final hasPaid = _userTransactions.where((t) => t['type'] == 'contribution').length > i;
+          // Check if user has paid for THIS specific cycle by checking transaction dates
+          final hasPaid = _userTransactions.where((t) {
+            if (t['type'] != 'contribution') return false;
+            if (t['created_at'] == null) return false;
+            
+            final txnDate = DateTime.parse(t['created_at']);
+            // Payment is for this cycle if it's between cycle start and end
+            return txnDate.isAfter(cycleStartDate.subtract(const Duration(days: 1))) && 
+                   txnDate.isBefore(cycleEndDate.add(const Duration(days: 1)));
+          }).isNotEmpty;
           
           String status;
           Color color;
           
           if (hasPaid) {
-            status = 'Paid';
+            status = 'Completed';
             color = Colors.green;
           } else if (isPast) {
             status = 'Overdue';
@@ -607,7 +648,7 @@ class _OverviewTabState extends State<_OverviewTab> {
           return _buildScheduleItem(
             context, 
             i + 1, 
-            'Due: ${DateFormat('MMM d').format(dueDate)}', 
+            'Due: ${DateFormat('MMM d, yyyy').format(cycleEndDate)}', 
             status, 
             color
           );
@@ -853,20 +894,23 @@ class _ScheduleTab extends StatefulWidget {
 
 class _ScheduleTabState extends State<_ScheduleTab> {
   Map<String, dynamic>? _pool;
+  List<Map<String, dynamic>> _transactions = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadPool();
+    _loadData();
   }
 
-  Future<void> _loadPool() async {
+  Future<void> _loadData() async {
     try {
       final pool = await PoolService.getPoolDetails(widget.poolId);
+      final transactions = await PoolService.getUserPoolTransactions(widget.poolId);
       if (mounted) {
         setState(() {
           _pool = pool;
+          _transactions = transactions;
           _isLoading = false;
         });
       }
@@ -882,6 +926,7 @@ class _ScheduleTabState extends State<_ScheduleTab> {
 
     final startDate = DateTime.parse(_pool!['start_date']);
     final totalRounds = _pool!['total_rounds'] as int;
+    final now = DateTime.now();
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -889,20 +934,46 @@ class _ScheduleTabState extends State<_ScheduleTab> {
         Text('Contribution Schedule', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 16),
         ...List.generate(totalRounds, (i) {
-          final dueDate = startDate.add(Duration(days: i * 30));
-          final isPast = dueDate.isBefore(DateTime.now());
+          final cycleStartDate = startDate.add(Duration(days: i * 30));
+          final cycleEndDate = startDate.add(Duration(days: (i + 1) * 30));
+          final isPast = cycleEndDate.isBefore(now);
+          
+          // Check if user has paid for THIS specific cycle
+          final hasPaid = _transactions.where((t) {
+            if (t['type'] != 'contribution') return false;
+            if (t['created_at'] == null) return false;
+            
+            final txnDate = DateTime.parse(t['created_at']);
+            return txnDate.isAfter(cycleStartDate.subtract(const Duration(days: 1))) && 
+                   txnDate.isBefore(cycleEndDate.add(const Duration(days: 1)));
+          }).isNotEmpty;
+          
+          String status;
+          Color color;
+          
+          if (hasPaid) {
+            status = 'Completed';
+            color = Colors.green;
+          } else if (isPast) {
+            status = 'Overdue';
+            color = Colors.red;
+          } else {
+            status = 'Upcoming';
+            color = Colors.blue;
+          }
           
           return Card(
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor: isPast ? Colors.green : Colors.grey.shade300,
-                child: Text('${i + 1}', style: TextStyle(color: isPast ? Colors.white : Colors.black)),
+                backgroundColor: color.withOpacity(0.1),
+                child: Text('${i + 1}', style: TextStyle(color: color, fontWeight: FontWeight.bold)),
               ),
               title: Text('Cycle ${i + 1}'),
-              subtitle: Text('Due: ${DateFormat('MMM d, yyyy').format(dueDate)}'),
+              subtitle: Text('Due: ${DateFormat('MMM d, yyyy').format(cycleEndDate)}'),
               trailing: Chip(
-                label: Text(isPast ? 'Completed' : 'Upcoming'),
-                backgroundColor: isPast ? Colors.green.shade50 : Colors.grey.shade200,
+                label: Text(status),
+                backgroundColor: color.withOpacity(0.1),
+                labelStyle: TextStyle(color: color, fontWeight: FontWeight.bold),
               ),
             ),
           );

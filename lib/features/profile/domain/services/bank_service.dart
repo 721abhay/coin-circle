@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/models/bank_account_model.dart';
 
@@ -21,7 +22,7 @@ class BankService {
           .map((json) => BankAccount.fromJson(json))
           .toList();
     } catch (e) {
-      print('Error fetching bank accounts: $e');
+      debugPrint('Error fetching bank accounts: $e');
       rethrow;
     }
   }
@@ -42,7 +43,7 @@ class BankService {
       if (response == null) return null;
       return BankAccount.fromJson(response);
     } catch (e) {
-      print('Error fetching primary bank account: $e');
+      debugPrint('Error fetching primary bank account: $e');
       return null;
     }
   }
@@ -92,7 +93,7 @@ class BankService {
 
       return newAccount;
     } catch (e) {
-      print('Error adding bank account: $e');
+      debugPrint('Error adding bank account: $e');
       rethrow;
     }
   }
@@ -123,7 +124,7 @@ class BankService {
 
       return BankAccount.fromJson(response);
     } catch (e) {
-      print('Error updating bank account: $e');
+      debugPrint('Error updating bank account: $e');
       rethrow;
     }
   }
@@ -140,7 +141,7 @@ class BankService {
         'user_id_param': userId,
       });
     } catch (e) {
-      print('Error setting primary bank account: $e');
+      debugPrint('Error setting primary bank account: $e');
       rethrow;
     }
   }
@@ -176,7 +177,7 @@ class BankService {
         }
       }
     } catch (e) {
-      print('Error deleting bank account: $e');
+      debugPrint('Error deleting bank account: $e');
       rethrow;
     }
   }
@@ -200,7 +201,7 @@ class BankService {
           .eq('id', accountId)
           .eq('user_id', userId);
     } catch (e) {
-      print('Error verifying bank account: $e');
+      debugPrint('Error verifying bank account: $e');
       rethrow;
     }
   }
@@ -216,7 +217,7 @@ class BankService {
         'branch_name': 'Branch Name',
       };
     } catch (e) {
-      print('Error fetching bank details from IFSC: $e');
+      debugPrint('Error fetching bank details from IFSC: $e');
       rethrow;
     }
   }

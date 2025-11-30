@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../../core/services/voting_service.dart';
 
 class VotingTab extends StatefulWidget {
@@ -40,7 +40,7 @@ class _VotingTabState extends State<VotingTab> {
       }
     } catch (e) {
       // Handle error
-      print('Error loading voting status: $e');
+      debugPrint('Error loading voting status: $e');
     }
   }
 
@@ -120,7 +120,7 @@ class _VotingTabState extends State<VotingTab> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Winning Amount: ₹${widget.winner['winning_amount']}',
+              'Winning Amount: ?${widget.winner['winning_amount']}',
               style: const TextStyle(fontSize: 18, color: Colors.green, fontWeight: FontWeight.bold),
             ),
           ],

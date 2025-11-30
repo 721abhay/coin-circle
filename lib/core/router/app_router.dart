@@ -30,18 +30,6 @@ import 'package:coin_circle/features/gamification/presentation/screens/leaderboa
 import 'package:coin_circle/features/gamification/presentation/screens/referral_screen.dart';
 import 'package:coin_circle/features/gamification/presentation/screens/friend_list_screen.dart';
 import 'package:coin_circle/features/gamification/presentation/screens/review_list_screen.dart';
-import 'package:coin_circle/features/gamification/presentation/screens/badge_list_screen.dart';
-import 'package:coin_circle/features/admin/presentation/screens/creator_dashboard_screen.dart';
-import 'package:coin_circle/features/admin/presentation/screens/member_management_screen.dart';
-import 'package:coin_circle/features/admin/presentation/screens/announcements_screen.dart';
-import 'package:coin_circle/features/admin/presentation/screens/pool_settings_screen.dart';
-import 'package:coin_circle/features/admin/presentation/screens/financial_controls_screen.dart';
-import 'package:coin_circle/features/admin/presentation/screens/moderation_dashboard_screen.dart';
-import 'package:coin_circle/features/admin/presentation/screens/admin_dashboard_screen.dart';
-import 'package:coin_circle/features/admin/presentation/screens/kyc_verification_screen.dart' as admin_kyc;
-import 'package:coin_circle/features/profile/presentation/screens/personal_analytics_screen.dart';
-import 'package:coin_circle/features/profile/presentation/screens/help_center_screen.dart';
-import 'package:coin_circle/features/profile/presentation/screens/contact_support_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/community_support_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/feedback_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/public_profile_screen.dart';
@@ -81,6 +69,19 @@ import 'package:coin_circle/features/expenses/presentation/screens/expense_track
 import 'package:coin_circle/features/goals/presentation/screens/financial_goals_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/setup_pin_screen.dart';
 import 'package:coin_circle/features/auth/presentation/screens/verify_otp_screen.dart';
+import 'package:coin_circle/features/gamification/presentation/screens/badge_list_screen.dart';
+import 'package:coin_circle/features/admin/presentation/screens/creator_dashboard_screen.dart';
+import 'package:coin_circle/features/admin/presentation/screens/member_management_screen.dart';
+import 'package:coin_circle/features/admin/presentation/screens/announcements_screen.dart';
+import 'package:coin_circle/features/admin/presentation/screens/pool_settings_screen.dart';
+import 'package:coin_circle/features/admin/presentation/screens/financial_controls_screen.dart';
+import 'package:coin_circle/features/admin/presentation/screens/moderation_dashboard_screen.dart';
+import 'package:coin_circle/features/admin/presentation/screens/admin_dashboard_screen.dart';
+import 'package:coin_circle/features/admin/presentation/screens/kyc_verification_screen.dart' as admin_kyc;
+import 'package:coin_circle/features/profile/presentation/screens/personal_analytics_screen.dart';
+import 'package:coin_circle/features/profile/presentation/screens/help_center_screen.dart';
+import 'package:coin_circle/features/profile/presentation/screens/contact_support_screen.dart';
+import 'package:coin_circle/features/admin/presentation/screens/platform_revenue_screen.dart';
 import 'package:coin_circle/features/debug/database_test_screen.dart';
 
 
@@ -296,6 +297,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/support/contact',
       builder: (context, state) => const ContactSupportScreen(),
+    ),
+    GoRoute(
+      path: '/platform-revenue',
+      builder: (context, state) => const PlatformRevenueScreen(),
     ),
     GoRoute(
       path: '/support/community',

@@ -51,7 +51,7 @@ class _FinancialControlsScreenState extends State<FinancialControlsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Financial Controls')),
+      appBar: AppBar(title: const Text('Financial Overview')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -59,35 +59,25 @@ class _FinancialControlsScreenState extends State<FinancialControlsScreen> {
               children: [
                 _buildOverviewCard(context),
                 const SizedBox(height: 24),
-                const Text('Adjustments', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                _buildActionTile(
-                  context,
-                  'Waive Late Fees',
-                  'Remove fees for specific members',
-                  Icons.money_off,
-                  () => _showNotImplemented(context),
-                ),
-                _buildActionTile(
-                  context,
-                  'Manual Payment',
-                  'Record an offline payment',
-                  Icons.payments_outlined,
-                  () => _showNotImplemented(context),
-                ),
-                _buildActionTile(
-                  context,
-                  'Adjust Balance',
-                  'Credit/Debit member wallet',
-                  Icons.account_balance_wallet_outlined,
-                  () => _showNotImplemented(context),
-                ),
-                _buildActionTile(
-                  context,
-                  'Process Refund',
-                  'Return funds to source',
-                  Icons.replay,
-                  () => _showNotImplemented(context),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: Colors.blue),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Advanced financial controls (Manual Payments, Refunds, Adjustments) will be available in the next update.',
+                          style: TextStyle(color: Colors.blue.shade800),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

@@ -70,7 +70,7 @@ class _LevelSystemScreenState extends State<LevelSystemScreen> {
         }
       }
     } catch (e) {
-      print('Error loading level data: $e');
+      debugPrint('Error loading level data: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

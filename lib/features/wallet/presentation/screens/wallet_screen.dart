@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/services/wallet_service.dart';
 
+import 'package:razorpay_flutter/razorpay_flutter.dart';
+
 class WalletScreen extends StatefulWidget {
   const WalletScreen({super.key});
 
@@ -14,11 +16,88 @@ class _WalletScreenState extends State<WalletScreen> {
   Map<String, dynamic>? _wallet;
   List<Map<String, dynamic>> _transactions = [];
   bool _isLoading = true;
+  late Razorpay _razorpay;
+  double _pendingDepositAmount = 0.0;
 
   @override
   void initState() {
     super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
     _loadWalletData();
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    try {
+      // In a real app, verify the signature on the backend!
+      await WalletService.deposit(
+        amount: _pendingDepositAmount,
+        method: 'razorpay',
+        reference: response.paymentId,
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Payment Successful: ${response.paymentId}')),
+        );
+        _loadWalletData();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating wallet: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Payment Failed: ${response.message}'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('External Wallet Selected: ${response.walletName}')),
+      );
+    }
+  }
+
+  void _openRazorpayCheckout(double amount) {
+    _pendingDepositAmount = amount;
+    var options = {
+      'key': 'rzp_test_1DP5mmOlF5G5ag', // Replace with your Key ID
+      'amount': (amount * 100).toInt(), // Amount in paise
+      'name': 'Coin Circle',
+      'description': 'Add Money to Wallet',
+      'retry': {'enabled': true, 'max_count': 1},
+      'send_sms_hash': true,
+      'prefill': {
+        'contact': '8888888888', // Should come from user profile
+        'email': 'test@razorpay.com' // Should come from user profile
+      },
+      'external': {
+        'wallets': ['paytm']
+      }
+    };
+
+    try {
+      _razorpay.open(options);
+    } catch (e) {
+      debugPrint('Error: $e');
+    }
   }
 
   Future<void> _loadWalletData() async {
@@ -197,13 +276,15 @@ class _WalletScreenState extends State<WalletScreen> {
             style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
-          _buildBalanceRow('Available Balance', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(_wallet?['balance'] ?? 0.0), Colors.green, Icons.account_balance_wallet),
+          _buildBalanceRow('Available Balance', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(_wallet?['available_balance'] ?? 0.0), Colors.green, Icons.account_balance_wallet),
+          const Divider(height: 24),
+          _buildBalanceRow('Withdrawable Winnings', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(_wallet?['winning_balance'] ?? 0.0), Colors.teal, Icons.monetization_on),
           const Divider(height: 24),
           _buildBalanceRow('Locked in Pools', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(_wallet?['locked_balance'] ?? 0.0), Colors.orange, Icons.lock),
           const Divider(height: 24),
           _buildBalanceRow('Pending Transactions', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(_wallet?['pending_amount'] ?? 0.0), Colors.blue, Icons.pending),
           const Divider(height: 24),
-          _buildBalanceRow('Total Winnings', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(_wallet?['total_winnings'] ?? 0.0), Colors.purple, Icons.emoji_events),
+          _buildBalanceRow('Total Winnings (Lifetime)', NumberFormat.currency(symbol: '₹', locale: 'en_IN').format(_wallet?['total_winnings'] ?? 0.0), Colors.purple, Icons.emoji_events),
         ],
       ),
     );
@@ -334,7 +415,7 @@ class _WalletScreenState extends State<WalletScreen> {
 
   Future<void> _showAddMoneyDialog(BuildContext context) async {
     final TextEditingController amountController = TextEditingController();
-    String selectedMethod = 'bank_transfer';
+    String selectedMethod = 'razorpay';
 
     await showDialog(
       context: context,
@@ -376,23 +457,22 @@ class _WalletScreenState extends State<WalletScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text('Payment Method', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Payment Gateway', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: selectedMethod,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.blue),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.blue.shade50,
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'bank_transfer', child: Text('Bank Transfer')),
-                    DropdownMenuItem(value: 'card', child: Text('Credit/Debit Card')),
-                    DropdownMenuItem(value: 'upi', child: Text('UPI')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() => selectedMethod = value);
-                    }
-                  },
+                  child: Row(
+                    children: [
+                      const Icon(Icons.payment, color: Colors.blue),
+                      const SizedBox(width: 12),
+                      const Text('Razorpay (Cards, UPI, NetBanking)', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -413,26 +493,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 }
 
                 Navigator.pop(dialogContext);
-                
-                try {
-                  await WalletService.deposit(
-                    amount: amount,
-                    method: selectedMethod,
-                  );
-                  
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Successfully added ₹${amount.toStringAsFixed(2)} to wallet')),
-                    );
-                    _loadWalletData(); // Refresh wallet data
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-                    );
-                  }
-                }
+                _openRazorpayCheckout(amount);
               },
               child: const Text('Add Money'),
             ),
@@ -448,7 +509,7 @@ class _WalletScreenState extends State<WalletScreen> {
     String selectedMethod = 'bank_transfer';
 
     final wallet = _wallet;
-    final availableBalance = wallet != null ? (wallet['available_balance'] as num).toDouble() : 0.0;
+    final winningBalance = wallet != null ? (wallet['winning_balance'] as num?)?.toDouble() ?? 0.0 : 0.0;
 
     await showDialog(
       context: context,
@@ -474,9 +535,9 @@ class _WalletScreenState extends State<WalletScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Available: ₹${availableBalance.toStringAsFixed(2)}', 
+                            Text('Withdrawable Winnings: ₹${winningBalance.toStringAsFixed(2)}', 
                                 style: const TextStyle(fontWeight: FontWeight.bold)),
-                            const Text('Min: ₹10 • Processing: 1-3 days', 
+                            const Text('Only winnings can be withdrawn.', 
                                 style: TextStyle(fontSize: 12)),
                           ],
                         ),
@@ -534,6 +595,13 @@ class _WalletScreenState extends State<WalletScreen> {
                 if (amount == null || amount <= 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Please enter a valid amount')),
+                  );
+                  return;
+                }
+
+                if (amount > winningBalance) {
+                   ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Amount exceeds withdrawable winnings')),
                   );
                   return;
                 }

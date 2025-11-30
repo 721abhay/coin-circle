@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class GamificationService {
@@ -14,7 +15,7 @@ class GamificationService {
       
       return response;
     } catch (e) {
-      print('Error fetching gamification profile: $e');
+      debugPrint('Error fetching gamification profile: $e');
       return null;
     }
   }
@@ -29,7 +30,7 @@ class GamificationService {
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching badges: $e');
+      debugPrint('Error fetching badges: $e');
       return [];
     }
   }
@@ -44,7 +45,7 @@ class GamificationService {
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching user badges: $e');
+      debugPrint('Error fetching user badges: $e');
       return [];
     }
   }
@@ -60,7 +61,7 @@ class GamificationService {
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching active challenges: $e');
+      debugPrint('Error fetching active challenges: $e');
       return [];
     }
   }
@@ -75,7 +76,7 @@ class GamificationService {
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching user challenges: $e');
+      debugPrint('Error fetching user challenges: $e');
       return [];
     }
   }
@@ -91,7 +92,7 @@ class GamificationService {
         'is_completed': false,
       });
     } catch (e) {
-      print('Error joining challenge: $e');
+      debugPrint('Error joining challenge: $e');
       throw e;
     }
   }
@@ -108,7 +109,7 @@ class GamificationService {
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching streak logs: $e');
+      debugPrint('Error fetching streak logs: $e');
       return [];
     }
   }
@@ -127,7 +128,7 @@ class GamificationService {
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching leaderboard: $e');
+      debugPrint('Error fetching leaderboard: $e');
       return [];
     }
   }
@@ -143,7 +144,7 @@ class GamificationService {
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching reviews: $e');
+      debugPrint('Error fetching reviews: $e');
       return [];
     }
   }
@@ -163,7 +164,7 @@ class GamificationService {
         });
       }
     } catch (e) {
-      print('Error ensuring gamification profile: $e');
+      debugPrint('Error ensuring gamification profile: $e');
     }
   }
 }

@@ -80,7 +80,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
         });
       }
     } catch (e) {
-      print('Error loading profile: $e');
+      debugPrint('Error loading profile: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }

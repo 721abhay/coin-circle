@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CommunityService {
@@ -12,7 +13,7 @@ class CommunityService {
           .order('created_at', ascending: false);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching forum posts: $e');
+      debugPrint('Error fetching forum posts: $e');
       return [];
     }
   }

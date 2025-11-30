@@ -82,6 +82,20 @@ class _CreatePoolScreenState extends ConsumerState<CreatePoolScreen> {
     );
 
     try {
+      // Auto-calculate joining fee based on contribution amount (capped at ₹100)
+      double joiningFee = 50.0;
+      if (state.amount < 1000) {
+        joiningFee = 50.0;
+      } else if (state.amount < 3000) {
+        joiningFee = 60.0;
+      } else if (state.amount < 5000) {
+        joiningFee = 70.0;
+      } else if (state.amount < 10000) {
+        joiningFee = 80.0;
+      } else {
+        joiningFee = 100.0; // Capped at ₹100
+      }
+      
       await PoolService.createPool(
         name: state.name,
         description: state.description,
@@ -92,6 +106,8 @@ class _CreatePoolScreenState extends ConsumerState<CreatePoolScreen> {
         startDate: DateTime.now().add(const Duration(days: 1)),
         privacy: state.isPrivate ? 'private' : 'public',
         type: 'standard', // Default type
+        paymentDay: state.paymentDay, // Day of month for payment
+        joiningFee: joiningFee, // Auto-calculated joining fee
       );
 
       if (mounted) {
@@ -304,28 +320,99 @@ class _PoolRulesStep extends ConsumerWidget {
             onChanged: (value) => ref.read(createPoolProvider.notifier).updateMaxMembers(value.toInt()),
           ),
           const SizedBox(height: 24),
+          
+          // Payment Day - Only for Monthly pools
+          if (state.frequency == 'Monthly') ...[
+            Text('Payment Day', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<int>(
+              value: state.paymentDay,
+              decoration: const InputDecoration(
+                labelText: 'Day of Month',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.calendar_today),
+                helperText: 'Select which day of the month members must pay',
+              ),
+              items: List.generate(28, (index) => index + 1)
+                  .map((day) => DropdownMenuItem(
+                        value: day,
+                        child: Text('Day $day of every month'),
+                      ))
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  ref.read(createPoolProvider.notifier).updatePaymentDay(value);
+                }
+              },
+            ),
+            const SizedBox(height: 24),
+          ] else if (state.frequency == 'Weekly') ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Payments due every 7 days from pool start date',
+                      style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ] else if (state.frequency == 'Bi-weekly') ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Payments due every 14 days from pool start date',
+                      style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+          
           Text('Late Payment Policy', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  initialValue: state.lateGracePeriod.toString(),
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Grace Period (Days)'),
-                  onChanged: (value) => ref.read(createPoolProvider.notifier).updateLateGracePeriod(int.tryParse(value) ?? 3),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber, color: Colors.orange.shade700, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Late Fee: ₹50 on first day late, then +₹10 each day (50, 60, 70, 80...)',
+                    style: TextStyle(fontSize: 12, color: Colors.orange.shade900, fontWeight: FontWeight.w600),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextFormField(
-                  initialValue: state.lateFee.toString(),
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Late Fee (₹)'),
-                  onChanged: (value) => ref.read(createPoolProvider.notifier).updateLateFee(double.tryParse(value) ?? 5.0),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 24),
           DropdownButtonFormField<String>(
@@ -382,13 +469,6 @@ class _AdditionalSettingsStep extends ConsumerWidget {
             label: '${state.emergencyFund.toInt()}%',
             onChanged: (value) => ref.read(createPoolProvider.notifier).updateEmergencyFund(value),
           ),
-          const SizedBox(height: 16),
-          SwitchListTile(
-            title: const Text('Allow Early Closure'),
-            subtitle: const Text('Requires unanimous vote'),
-            value: state.allowEarlyClosure,
-            onChanged: (value) => ref.read(createPoolProvider.notifier).updateEarlyClosure(value),
-          ),
           SwitchListTile(
             title: const Text('Enable Chat'),
             value: state.enableChat,
@@ -440,8 +520,17 @@ class _ReviewStep extends ConsumerWidget {
           const Divider(),
           _buildSectionHeader(context, 'Rules'),
           _buildSummaryRow('Members', '${state.maxMembers}'),
+          _buildSummaryRow(
+            'Payment Schedule',
+            state.frequency == 'Monthly'
+                ? 'Day ${state.paymentDay} of every month'
+                : state.frequency == 'Weekly'
+                    ? 'Every 7 days from start date'
+                    : 'Every 14 days from start date',
+          ),
           _buildSummaryRow('Winner Selection', state.winnerSelectionMethod),
-          _buildSummaryRow('Late Fee', '₹${state.lateFee} after ${state.lateGracePeriod} days'),
+          _buildSummaryRow('Late Fees', '₹50 + ₹10/day (auto-calculated)'),
+          _buildSummaryRow('Joining Fee', 'Auto-calculated based on amount'),
           const SizedBox(height: 32),
           Row(
             children: [

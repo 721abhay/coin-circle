@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'chat_service.dart';
 
@@ -18,7 +19,7 @@ class WinnerService {
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching winner history: $e');
+      debugPrint('Error fetching winner history: $e');
       rethrow;
     }
   }
@@ -40,7 +41,7 @@ class WinnerService {
         'status': 'active',
       });
     } catch (e) {
-      print('Error placing bid: $e');
+      debugPrint('Error placing bid: $e');
       rethrow;
     }
   }
@@ -58,7 +59,7 @@ class WinnerService {
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching bids: $e');
+      debugPrint('Error fetching bids: $e');
       rethrow;
     }
   }
@@ -90,10 +91,10 @@ class WinnerService {
           amount: amount,
         );
       } catch (e) {
-        print('Failed to send winner announcement: $e');
+        debugPrint('Failed to send winner announcement: $e');
       }
     } catch (e) {
-      print('Error selecting random winner: $e');
+      debugPrint('Error selecting random winner: $e');
       rethrow;
     }
   }
@@ -125,10 +126,10 @@ class WinnerService {
           amount: amount,
         );
       } catch (e) {
-        print('Failed to send winner announcement: $e');
+        debugPrint('Failed to send winner announcement: $e');
       }
     } catch (e) {
-      print('Error selecting bid winner: $e');
+      debugPrint('Error selecting bid winner: $e');
       rethrow;
     }
   }

@@ -112,7 +112,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
     setState(() {
       _logs.add(message);
     });
-    print(message); // Also print to console
+    debugPrint(message); // Also print to console
   }
 
   @override

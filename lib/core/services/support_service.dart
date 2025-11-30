@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupportService {
@@ -27,7 +28,7 @@ class SupportService {
 
       return response;
     } catch (e) {
-      print('Error creating ticket: $e');
+      debugPrint('Error creating ticket: $e');
       throw e;
     }
   }
@@ -43,7 +44,7 @@ class SupportService {
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching FAQs: $e');
+      debugPrint('Error fetching FAQs: $e');
       return [];
     }
   }
@@ -59,7 +60,7 @@ class SupportService {
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching tutorials: $e');
+      debugPrint('Error fetching tutorials: $e');
       return [];
     }
   }
@@ -78,7 +79,7 @@ class SupportService {
       
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
-      print('Error fetching user tickets: $e');
+      debugPrint('Error fetching user tickets: $e');
       return [];
     }
   }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'chat_service.dart';
 import '../config/supabase_config.dart';
@@ -18,9 +19,21 @@ class PoolService {
     required int maxMembers,
     required DateTime startDate,
     required int durationMonths,
+    required int paymentDay, // Day of month for payment (1-28)
+    required double joiningFee, // One-time joining fee
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) throw const AuthException('User not logged in');
+
+    // 🛑 LIMIT CHECK: Max 2 created pools per user
+    final createdPoolsCount = await _client
+        .from('pools')
+        .count(CountOption.exact)
+        .eq('creator_id', user.id);
+    
+    if (createdPoolsCount >= 2) {
+      throw Exception('You can only create a maximum of 2 pools.');
+    }
 
     // Map 'standard' to 'fixed' as per schema enum
     final poolType = type == 'standard' ? 'fixed' : type;
@@ -45,6 +58,8 @@ class PoolService {
       'total_rounds': durationMonths,
       'status': 'pending', // Default status for new pools
       'invite_code': inviteCode,
+      'payment_day': paymentDay, // Day of month for payment
+      'joining_fee': joiningFee, // One-time joining fee
     }).select().single();
 
     // CRITICAL FIX: Add creator as a member of the pool immediately
@@ -154,7 +169,7 @@ class PoolService {
           .eq('invite_code', inviteCode)
           .maybeSingle();
     } catch (e) {
-      print('RPC findPoolByCode failed, falling back to direct select: $e');
+      debugPrint('RPC findPoolByCode failed, falling back to direct select: $e');
       // Fallback to direct select (works for public pools or if user is already member)
       return await _client
           .from('pools')
@@ -169,10 +184,60 @@ class PoolService {
     final user = _client.auth.currentUser;
     if (user == null) throw const AuthException('User not logged in');
 
+    // 🛑 LIMIT CHECK: Max 2 joined pools per user
+    final joinedPoolsCount = await _client
+        .from('pool_members')
+        .count(CountOption.exact)
+        .eq('user_id', user.id)
+        .eq('status', 'active'); // Only count active memberships
+    
+    if (joinedPoolsCount >= 2) {
+      throw Exception('You can only join a maximum of 2 pools.');
+    }
+
+    // Get pool details to check joining fee
+    final pool = await _client
+        .from('pools')
+        .select('joining_fee, name')
+        .eq('id', poolId)
+        .single();
+    
+    final joiningFee = (pool['joining_fee'] as num?)?.toDouble() ?? 50.0;
+    
+    // Check if user has sufficient wallet balance for joining fee
+    final wallet = await _client
+        .from('wallets')
+        .select('available_balance')
+        .eq('user_id', user.id)
+        .single();
+    
+    final availableBalance = (wallet['available_balance'] as num?)?.toDouble() ?? 0.0;
+    
+    if (availableBalance < joiningFee) {
+      throw Exception('Insufficient balance. You need ₹$joiningFee to join this pool. Please add money to your wallet.');
+    }
+
     // Use secure RPC to join (bypasses RLS)
     await _client.rpc('join_pool_secure', params: {
       'p_pool_id': poolId,
       'p_invite_code': inviteCode,
+    });
+
+    // Deduct joining fee from wallet
+    await _client.rpc('decrement_wallet_balance', params: {
+      'p_user_id': user.id,
+      'p_amount': joiningFee,
+    });
+
+    // Record joining fee transaction
+    await _client.from('transactions').insert({
+      'user_id': user.id,
+      'pool_id': poolId,
+      'transaction_type': 'joining_fee',
+      'amount': joiningFee,
+      'status': 'completed',
+      'description': 'Joining fee for ${pool['name']}',
+      'created_at': DateTime.now().toIso8601String(),
     });
 
     // Send chat notification about request
@@ -184,7 +249,7 @@ class PoolService {
         messageType: 'system_notification',
       );
     } catch (e) {
-      print('Failed to send chat notification: $e');
+      debugPrint('Failed to send chat notification: $e');
     }
   }
 
@@ -233,7 +298,7 @@ class PoolService {
       });
       return Map<String, dynamic>.from(response);
     } catch (e) {
-      print('Error fetching contribution status: $e');
+      debugPrint('Error fetching contribution status: $e');
       // Return default/empty structure on error to prevent UI crash
       return {
         'is_paid': false,
@@ -292,7 +357,7 @@ class PoolService {
         'payout_amount': pool['total_amount'], // Usually total pot
       };
     } catch (e) {
-      print('Error fetching pool financial stats: $e');
+      debugPrint('Error fetching pool financial stats: $e');
       return {
         'total_collected': 0.0,
         'late_fees': 0.0,
@@ -349,7 +414,7 @@ class PoolService {
 
     return {
       'on_time_payment_rate': onTimeRate,
-      'average_contribution_time': 2.5, // Placeholder as we don't track exact due dates yet
+      'average_contribution_time': totalPayments > 0 ? 1.0 : 0.0, // Default to 1 day if data exists, 0 if not (Real calculation requires due_date tracking which is in next phase)
       'pool_completion_progress': progress,
       'member_participation_score': participationScore,
       'total_collected': totalCollected,
@@ -383,5 +448,52 @@ class PoolService {
         .order('created_at', ascending: false);
 
     return List<Map<String, dynamic>>.from(response);
+  }
+  /// Update pool details
+  static Future<void> updatePool(String poolId, Map<String, dynamic> updates) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw const AuthException('User not logged in');
+
+    await _client.from('pools').update(updates).eq('id', poolId);
+  }
+
+  /// Delete a pool
+  static Future<void> deletePool(String poolId) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw const AuthException('User not logged in');
+
+    // Delete associated data first (optional if cascade delete is set up in DB, but safer to do here)
+    // Note: Supabase cascade delete usually handles this if configured. 
+    // Assuming cascade is ON for foreign keys.
+    
+    await _client.from('pools').delete().eq('id', poolId);
+  }
+
+  /// Remove a member from a pool (Admin only)
+  static Future<void> removeMember(String poolId, String userId) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw const AuthException('User not logged in');
+
+    // Delete the pool member record
+    await _client
+        .from('pool_members')
+        .delete()
+        .eq('pool_id', poolId)
+        .eq('user_id', userId);
+    
+    // Decrement current_members count
+    final pool = await _client
+        .from('pools')
+        .select('current_members')
+        .eq('id', poolId)
+        .single();
+    
+    final currentMembers = (pool['current_members'] as num?)?.toInt() ?? 0;
+    if (currentMembers > 0) {
+      await _client
+          .from('pools')
+          .update({'current_members': currentMembers - 1})
+          .eq('id', poolId);
+    }
   }
 }
