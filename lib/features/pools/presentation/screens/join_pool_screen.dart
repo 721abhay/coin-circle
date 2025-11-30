@@ -631,56 +631,38 @@ class _PoolPreviewSheet extends StatelessWidget {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Join Pool'),
+        title: const Text('Request to Join Pool'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('You are about to join "${pool['name']}".'),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.shade200),
-              ),
-              child: Column(
-                children: [
-                  _buildSummaryRow('Joining Fee', '₹${joiningFee.toStringAsFixed(0)}'),
-                  _buildSummaryRow('First Contribution', '₹${contributionAmount.toStringAsFixed(0)}'),
-                  const Divider(height: 16),
-                  _buildSummaryRow('Total to Pay Now', '₹${totalAmount.toStringAsFixed(0)}', bold: true),
-                  const Divider(height: 16),
-                  _buildSummaryRow('Monthly Payment', '₹${contributionAmount.toStringAsFixed(0)}'),
-                  _buildSummaryRow('Duration', '${pool['total_rounds']} Cycles'),
-                ],
-              ),
-            ),
+            Text('You are requesting to join "${pool['name']}".'),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.blue.shade50,
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
               ),
-              child: const Row(
+              child: Column(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.blue, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'You must pay the joining fee + first contribution now. Your request will be sent to the admin for approval after payment.',
-                      style: TextStyle(fontSize: 12),
-                    ),
+                  const Text(
+                    'Estimated Cost (Payable upon Approval)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                   ),
+                  const SizedBox(height: 8),
+                  _buildSummaryRow('Joining Fee', '₹${joiningFee.toStringAsFixed(0)}'),
+                  _buildSummaryRow('First Contribution', '₹${contributionAmount.toStringAsFixed(0)}'),
+                  const Divider(height: 16),
+                  _buildSummaryRow('Total Due Later', '₹${totalAmount.toStringAsFixed(0)}', bold: true),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             const Text(
-              'By confirming, you agree to the pool rules and commit to timely payments.',
-              style: TextStyle(fontSize: 11, color: Colors.grey),
+              'Your request will be sent to the admin. Once approved, you will need to complete the payment to join.',
+              style: TextStyle(fontSize: 13),
             ),
           ],
         ),
@@ -693,12 +675,12 @@ class _PoolPreviewSheet extends StatelessWidget {
             onPressed: () async {
               Navigator.of(dialogContext).pop(); // Close dialog
               Navigator.of(context).pop(); // Close sheet
-              await _processPaymentAndJoin(context);
+              await _sendJoinRequest(context);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
+              backgroundColor: const Color(0xFF6C63FF),
             ),
-            child: Text('Pay ₹${totalAmount.toStringAsFixed(0)} & Join'),
+            child: const Text('Send Request'),
           ),
         ],
       ),

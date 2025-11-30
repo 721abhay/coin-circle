@@ -136,32 +136,27 @@ class _PoolListState extends State<_PoolList> {
     setState(() => _isLoading = true);
     try {
       final pools = await PoolService.getUserPools();
-      debugPrint('📊 Loaded ${pools.length} pools from backend'); // Debug log
       
       if (mounted) {
         setState(() {
           _pools = pools.where((pool) {
-            // Get pool status safely and normalize
-            final poolStatus = (pool['status'] ?? 'pending').toString().toLowerCase();
-            final targetStatus = widget.status.toLowerCase();
+            final membershipStatus = (pool['membership_status'] ?? 'active').toString().toLowerCase();
+            final targetTab = widget.status.toLowerCase();
             
-            debugPrint('Checking pool: ${pool['name']} ($poolStatus) vs Target: $targetStatus'); // Debug log
-            
-            // Handle 'drafts' vs 'draft' mismatch
-            if (targetStatus == 'drafts' || targetStatus == 'draft') {
-              return poolStatus == 'draft';
+            if (targetTab == 'pending') {
+              return membershipStatus == 'pending' || membershipStatus == 'approved';
+            } else if (targetTab == 'active') {
+              return membershipStatus == 'active';
+            } else if (targetTab == 'completed') {
+              return membershipStatus == 'completed' || pool['status'] == 'completed';
             }
-            
-            // Handle 'active' vs 'paid' mapping if needed, or direct match
-            return poolStatus == targetStatus;
+            return false;
           }).toList();
           
-          debugPrint('✅ Filtered to ${_pools.length} pools for tab ${widget.status}'); // Debug log
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('❌ Error loading pools: $e'); // Debug log
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -177,21 +172,51 @@ class _PoolListState extends State<_PoolList> {
     return currentRound / totalRounds;
   }
 
-  Future<String> _getPaymentStatus(String poolId) async {
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId == null) return 'Pending';
-
-    final transactions = await Supabase.instance.client
-        .from('transactions')
-        .select()
-        .eq('pool_id', poolId)
-        .eq('user_id', userId)
-        .eq('transaction_type', 'contribution')
-        .gte('created_at', DateTime.now().subtract(const Duration(days: 30)).toIso8601String()) // Check recent contribution
-        .limit(1);
+  Future<void> _handleJoinPayment(Map<String, dynamic> pool) async {
+    final poolId = pool['id'];
+    final poolName = pool['name'];
     
-    if (transactions.isEmpty) return 'Pending';
-    return 'Paid';
+    // Show confirmation dialog
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Complete Joining'),
+        content: Text('Your request to join "$poolName" has been approved.\n\nProceed to pay the joining fee and first contribution?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Pay & Join')),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    // Show loading
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      await PoolService.completeJoinPayment(poolId);
+      
+      if (mounted) {
+        Navigator.pop(context); // Close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Successfully joined the pool!')),
+        );
+        _loadPools(); // Refresh list
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}')),
+        );
+      }
+    }
   }
 
   @override
@@ -217,11 +242,6 @@ class _PoolListState extends State<_PoolList> {
                     'No ${widget.status} pools found',
                     style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Pull down to refresh',
-                    style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
-                  ),
                 ],
               ),
             ),
@@ -237,28 +257,29 @@ class _PoolListState extends State<_PoolList> {
         itemCount: _pools.length,
         itemBuilder: (context, index) {
           final pool = _pools[index];
+          final membershipStatus = pool['membership_status'] ?? 'active';
+          final contributionAmount = (pool['contribution_amount'] as num?)?.toInt() ?? 0;
+          final maxMembers = (pool['max_members'] as num?)?.toInt() ?? 1;
           
-          return FutureBuilder<String>(
-            future: _getPaymentStatus(pool['id']),
-            builder: (context, snapshot) {
-              final paymentStatus = snapshot.data ?? 'Pending';
-              final contributionAmount = (pool['contribution_amount'] as num?)?.toInt() ?? 0;
-              final maxMembers = (pool['max_members'] as num?)?.toInt() ?? 1;
-              
-              return _ActivePoolCard(
-                name: pool['name'] ?? 'Unnamed Pool',
-                status: pool['status'] == 'active' ? paymentStatus : (pool['status'] == 'pending' ? 'Pending' : 'Overdue'),
-                nextDraw: pool['start_date'] != null 
-                    ? DateFormat('MMM d').format(DateTime.parse(pool['start_date']).add(const Duration(days: 30)))
-                    : 'TBD',
-                totalPoolAmount: contributionAmount * maxMembers,
-                contributionAmount: contributionAmount,
-                cycle: '${pool['current_round'] ?? 1} of ${pool['total_rounds'] ?? 12}',
-                progress: _calculateProgress(pool),
-                onTap: () => context.push('/pool-details/${pool['id']}'),
-                onPay: () => context.push('/payment', extra: {'poolId': pool['id'], 'amount': contributionAmount.toDouble()}),
-              );
-            },
+          // If approved, show special status
+          String displayStatus = membershipStatus == 'approved' ? 'Approved - Pay Now' : 
+                               (membershipStatus == 'pending' ? 'Request Pending' : 'Active');
+          
+          return _ActivePoolCard(
+            name: pool['name'] ?? 'Unnamed Pool',
+            status: displayStatus,
+            nextDraw: pool['start_date'] != null 
+                ? DateFormat('MMM d').format(DateTime.parse(pool['start_date']).add(const Duration(days: 30)))
+                : 'TBD',
+            totalPoolAmount: contributionAmount * maxMembers,
+            contributionAmount: contributionAmount,
+            cycle: '${pool['current_round'] ?? 1} of ${pool['total_rounds'] ?? 12}',
+            progress: _calculateProgress(pool),
+            onTap: () => context.push('/pool-details/${pool['id']}'),
+            onPay: membershipStatus == 'approved' 
+                ? () => _handleJoinPayment(pool)
+                : (membershipStatus == 'active' ? () => context.push('/payment', extra: {'poolId': pool['id'], 'amount': contributionAmount.toDouble()}) : null),
+            isApproved: membershipStatus == 'approved',
           );
         },
       ),
@@ -276,6 +297,7 @@ class _ActivePoolCard extends StatelessWidget {
   final double progress;
   final VoidCallback onTap;
   final VoidCallback? onPay;
+  final bool isApproved;
 
   const _ActivePoolCard({
     required this.name,
@@ -287,12 +309,13 @@ class _ActivePoolCard extends StatelessWidget {
     required this.progress,
     required this.onTap,
     this.onPay,
+    this.isApproved = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = status == 'Paid' ? Colors.green : (status == 'Pending' ? Colors.orange : Colors.red);
-    final statusIcon = status == 'Paid' ? Icons.check_circle : (status == 'Pending' ? Icons.access_time : Icons.warning);
+    final statusColor = isApproved ? Colors.green : (status == 'Paid' ? Colors.green : (status == 'Pending' || status == 'Request Pending' ? Colors.orange : Colors.red));
+    final statusIcon = isApproved ? Icons.check_circle_outline : (status == 'Paid' ? Icons.check_circle : (status == 'Pending' || status == 'Request Pending' ? Icons.access_time : Icons.warning));
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -370,11 +393,12 @@ class _ActivePoolCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  if (status != 'Paid' && onPay != null)
+                  if (onPay != null)
                     Expanded(
                       child: ElevatedButton(
                         onPressed: onPay,
-                        child: const Text('Pay Now'),
+                        style: isApproved ? ElevatedButton.styleFrom(backgroundColor: Colors.green) : null,
+                        child: Text(isApproved ? 'Pay Joining Fee' : 'Pay Now'),
                       ),
                     ),
                 ],

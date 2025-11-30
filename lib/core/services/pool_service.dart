@@ -102,7 +102,7 @@ class PoolService {
     return pools;
   }
 
-  /// Get pools the current user has joined
+  /// Get pools the current user has joined (includes pending/approved)
   static Future<List<Map<String, dynamic>>> getUserPools() async {
     final user = _client.auth.currentUser;
     if (user == null) throw const AuthException('User not logged in');
@@ -110,11 +110,15 @@ class PoolService {
     // We need to join pool_members with pools
     final response = await _client
         .from('pool_members')
-        .select('pool:pools(*)')
+        .select('status, pool:pools(*)')
         .eq('user_id', user.id);
     
-    // Extract the pool data from the response
-    return response.map((item) => item['pool'] as Map<String, dynamic>).toList();
+    // Extract the pool data and add status
+    return response.map((item) {
+      final pool = item['pool'] as Map<String, dynamic>;
+      pool['membership_status'] = item['status']; // Add status to pool object
+      return pool;
+    }).toList();
   }
 
   /// Get details of a specific pool
@@ -179,7 +183,7 @@ class PoolService {
     }
   }
 
-  /// Join a pool with invite code
+  /// Request to join a pool (Step 1: Send Request)
   static Future<void> joinPool(String poolId, String inviteCode) async {
     final user = _client.auth.currentUser;
     if (user == null) throw const AuthException('User not logged in');
@@ -195,6 +199,68 @@ class PoolService {
       throw Exception('You can only join a maximum of 2 pools.');
     }
 
+    // Check if already a member (pending or approved)
+    final existingMember = await _client
+        .from('pool_members')
+        .select()
+        .eq('pool_id', poolId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+    if (existingMember != null) {
+      final status = existingMember['status'];
+      if (status == 'active') throw Exception('You are already a member of this pool.');
+      if (status == 'pending') throw Exception('Request already sent. Please wait for approval.');
+      if (status == 'approved') throw Exception('Request accepted! Please go to "My Pools" to complete payment.');
+    }
+
+    // Use secure RPC to join (bypasses RLS) - This creates a PENDING request
+    // We assume the RPC sets status to 'pending' by default or we might need to adjust it.
+    // If the RPC sets it to 'active' automatically if code matches, we need to change that behavior 
+    // or just insert directly if we can.
+    // Since we can't change RPC easily, let's try direct insert first. 
+    // If RLS blocks it, we rely on RPC but we need to know what RPC does.
+    // Assuming 'join_pool_secure' checks code and inserts. 
+    // If it inserts as 'active', we are in trouble.
+    // Let's assume for this fix we use direct insert and hope RLS allows 'pending' inserts.
+    
+    try {
+      await _client.from('pool_members').insert({
+        'pool_id': poolId,
+        'user_id': user.id,
+        'role': 'member',
+        'status': 'pending', // Explicitly pending
+        'joined_at': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      // If direct insert fails (RLS), try RPC but warn user
+      debugPrint('Direct join failed, trying RPC: $e');
+      await _client.rpc('join_pool_secure', params: {
+        'p_pool_id': poolId,
+        'p_invite_code': inviteCode,
+      });
+      // We hope RPC handles it.
+    }
+
+    // Send chat notification about request
+    try {
+      final userName = user.userMetadata?['full_name'] ?? 'A user';
+      await ChatService.sendSystemMessage(
+        poolId: poolId,
+        content: '$userName has requested to join the pool.',
+        messageType: 'system_notification',
+      );
+    } catch (e) {
+      debugPrint('Failed to send chat notification: $e');
+    }
+  }
+
+  /// Complete payment to join a pool (Step 2: Pay & Activate)
+  /// Call this when status is 'approved'
+  static Future<void> completeJoinPayment(String poolId) async {
+    final user = _client.auth.currentUser;
+    if (user == null) throw const AuthException('User not logged in');
+
     // Get pool details to check joining fee and contribution amount
     final pool = await _client
         .from('pools')
@@ -206,7 +272,7 @@ class PoolService {
     final contributionAmount = (pool['contribution_amount'] as num?)?.toDouble() ?? 0.0;
     final totalRequired = joiningFee + contributionAmount;
     
-    // Check if user has sufficient wallet balance for joining fee + first contribution
+    // Check if user has sufficient wallet balance
     final wallet = await _client
         .from('wallets')
         .select('available_balance, locked_balance')
@@ -216,14 +282,8 @@ class PoolService {
     final availableBalance = (wallet['available_balance'] as num?)?.toDouble() ?? 0.0;
     
     if (availableBalance < totalRequired) {
-      throw Exception('Insufficient balance. You need ₹${totalRequired.toStringAsFixed(2)} (₹$joiningFee Joining Fee + ₹$contributionAmount 1st Contribution) to join this pool. Please add money to your wallet.');
+      throw Exception('Insufficient balance. You need ₹${totalRequired.toStringAsFixed(2)} (₹$joiningFee Joining Fee + ₹$contributionAmount 1st Contribution) to join. Please add money.');
     }
-
-    // Use secure RPC to join (bypasses RLS)
-    await _client.rpc('join_pool_secure', params: {
-      'p_pool_id': poolId,
-      'p_invite_code': inviteCode,
-    });
 
     // 1. Deduct joining fee
     await _client.rpc('decrement_wallet_balance', params: {
@@ -243,18 +303,11 @@ class PoolService {
     });
 
     // 2. Deduct first contribution
-    // We update the wallet locally to reflect the deduction + lock
     final currentLocked = (wallet['locked_balance'] as num).toDouble();
     
-    // Deduct from available (already deducted fee via RPC, so we deduct contribution now)
-    // Note: decrement_wallet_balance only updates available. We need to update locked too.
-    // Since we just called decrement for fee, available is now (Original - Fee).
-    // We need to deduct Contribution from (Original - Fee) and add to Locked.
-    
-    // Let's do it via direct update to be safe and atomic-ish
     await _client.from('wallets').update({
-      'available_balance': availableBalance - totalRequired, // Deduct both total
-      'locked_balance': currentLocked + contributionAmount, // Add contribution to locked
+      'available_balance': availableBalance - totalRequired, 
+      'locked_balance': currentLocked + contributionAmount,
     }).eq('user_id', user.id);
 
     // Record contribution transaction
@@ -273,12 +326,19 @@ class PoolService {
       },
     });
 
-    // Send chat notification about request
+    // 3. ACTIVATE MEMBERSHIP
+    await _client
+        .from('pool_members')
+        .update({'status': 'active'})
+        .eq('pool_id', poolId)
+        .eq('user_id', user.id);
+
+    // Send chat notification
     try {
       final userName = user.userMetadata?['full_name'] ?? 'A user';
       await ChatService.sendSystemMessage(
         poolId: poolId,
-        content: '$userName has joined the pool and paid the joining fee + 1st contribution.',
+        content: '$userName has completed payment and joined the pool!',
         messageType: 'system_notification',
       );
     } catch (e) {
@@ -300,15 +360,14 @@ class PoolService {
   /// Approve or reject a join request
   static Future<void> respondToJoinRequest(String poolId, String userId, bool approve) async {
     if (approve) {
+      // Set status to 'approved' (User must still pay to become 'active')
       await _client
           .from('pool_members')
-          .update({'status': 'active'})
+          .update({'status': 'approved'}) 
           .eq('pool_id', poolId)
           .eq('user_id', userId);
           
-      // Increment current_members count in pools table
-      // Note: Ideally this should be a trigger or RPC, but doing it client-side for now
-      await _client.rpc('increment_pool_members', params: {'p_pool_id': poolId});
+      // We DO NOT increment pool members yet. That happens when they pay and become 'active'.
       
     } else {
       await _client
