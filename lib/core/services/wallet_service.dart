@@ -10,10 +10,23 @@ class WalletService {
   /// Get the current user's ID
   static String? get _userId => _client.auth.currentUser?.id;
 
+  // Cache for wallet data to prevent rate limiting
+  static Map<String, dynamic>? _cachedWallet;
+  static DateTime? _lastWalletFetchTime;
+  static const Duration _walletCacheDuration = Duration(seconds: 2);
+
   /// Get the current user's wallet (creates if doesn't exist)
-  static Future<Map<String, dynamic>> getWallet() async {
+  static Future<Map<String, dynamic>> getWallet({bool forceRefresh = false}) async {
     if (_userId == null) {
       throw Exception('User not authenticated');
+    }
+
+    // Return cached wallet if valid and not forced refresh
+    if (!forceRefresh && 
+        _cachedWallet != null && 
+        _lastWalletFetchTime != null && 
+        DateTime.now().difference(_lastWalletFetchTime!) < _walletCacheDuration) {
+      return _cachedWallet!;
     }
 
     try {
@@ -25,6 +38,8 @@ class WalletService {
           .maybeSingle();
 
       if (response != null) {
+        _cachedWallet = response;
+        _lastWalletFetchTime = DateTime.now();
         return response;
       }
 
@@ -41,9 +56,13 @@ class WalletService {
           .select()
           .single();
 
+      _cachedWallet = newWallet;
+      _lastWalletFetchTime = DateTime.now();
       return newWallet;
     } catch (e) {
       debugPrint('Error fetching/creating wallet: $e');
+      // If error (e.g. rate limit), return cache if available even if expired
+      if (_cachedWallet != null) return _cachedWallet!;
       rethrow;
     }
   }

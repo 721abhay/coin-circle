@@ -39,7 +39,13 @@ WHERE p.id IS NULL
 ON CONFLICT (id) DO NOTHING;
 
 -- 6. Add RLS policies for admin access
-CREATE POLICY IF NOT EXISTS "Admins can view all profiles"
+-- Drop existing policies first
+DROP POLICY IF EXISTS "Admins can view all profiles" ON profiles;
+DROP POLICY IF EXISTS "Admins can update all profiles" ON profiles;
+DROP POLICY IF EXISTS "Admins can delete profiles" ON profiles;
+
+-- Create new policies
+CREATE POLICY "Admins can view all profiles"
 ON profiles FOR SELECT
 TO authenticated
 USING (
@@ -48,7 +54,7 @@ USING (
   )
 );
 
-CREATE POLICY IF NOT EXISTS "Admins can update all profiles"
+CREATE POLICY "Admins can update all profiles"
 ON profiles FOR UPDATE
 TO authenticated
 USING (
@@ -57,7 +63,7 @@ USING (
   )
 );
 
-CREATE POLICY IF NOT EXISTS "Admins can delete profiles"
+CREATE POLICY "Admins can delete profiles"
 ON profiles FOR DELETE
 TO authenticated
 USING (

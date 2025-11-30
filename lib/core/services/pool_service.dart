@@ -195,26 +195,28 @@ class PoolService {
       throw Exception('You can only join a maximum of 2 pools.');
     }
 
-    // Get pool details to check joining fee
+    // Get pool details to check joining fee and contribution amount
     final pool = await _client
         .from('pools')
-        .select('joining_fee, name')
+        .select('joining_fee, name, contribution_amount')
         .eq('id', poolId)
         .single();
     
     final joiningFee = (pool['joining_fee'] as num?)?.toDouble() ?? 50.0;
+    final contributionAmount = (pool['contribution_amount'] as num?)?.toDouble() ?? 0.0;
+    final totalRequired = joiningFee + contributionAmount;
     
-    // Check if user has sufficient wallet balance for joining fee
+    // Check if user has sufficient wallet balance for joining fee + first contribution
     final wallet = await _client
         .from('wallets')
-        .select('available_balance')
+        .select('available_balance, locked_balance')
         .eq('user_id', user.id)
         .single();
     
     final availableBalance = (wallet['available_balance'] as num?)?.toDouble() ?? 0.0;
     
-    if (availableBalance < joiningFee) {
-      throw Exception('Insufficient balance. You need ₹$joiningFee to join this pool. Please add money to your wallet.');
+    if (availableBalance < totalRequired) {
+      throw Exception('Insufficient balance. You need ₹${totalRequired.toStringAsFixed(2)} (₹$joiningFee Joining Fee + ₹$contributionAmount 1st Contribution) to join this pool. Please add money to your wallet.');
     }
 
     // Use secure RPC to join (bypasses RLS)
@@ -223,7 +225,7 @@ class PoolService {
       'p_invite_code': inviteCode,
     });
 
-    // Deduct joining fee from wallet
+    // 1. Deduct joining fee
     await _client.rpc('decrement_wallet_balance', params: {
       'p_user_id': user.id,
       'p_amount': joiningFee,
@@ -240,12 +242,43 @@ class PoolService {
       'created_at': DateTime.now().toIso8601String(),
     });
 
+    // 2. Deduct first contribution
+    // We update the wallet locally to reflect the deduction + lock
+    final currentLocked = (wallet['locked_balance'] as num).toDouble();
+    
+    // Deduct from available (already deducted fee via RPC, so we deduct contribution now)
+    // Note: decrement_wallet_balance only updates available. We need to update locked too.
+    // Since we just called decrement for fee, available is now (Original - Fee).
+    // We need to deduct Contribution from (Original - Fee) and add to Locked.
+    
+    // Let's do it via direct update to be safe and atomic-ish
+    await _client.from('wallets').update({
+      'available_balance': availableBalance - totalRequired, // Deduct both total
+      'locked_balance': currentLocked + contributionAmount, // Add contribution to locked
+    }).eq('user_id', user.id);
+
+    // Record contribution transaction
+    await _client.from('transactions').insert({
+      'user_id': user.id,
+      'pool_id': poolId,
+      'transaction_type': 'contribution',
+      'amount': contributionAmount,
+      'currency': 'INR',
+      'status': 'completed',
+      'payment_method': 'wallet',
+      'description': 'Contribution for Round 1 (Upon Joining)',
+      'metadata': {
+        'round': 1,
+        'is_joining_contribution': true,
+      },
+    });
+
     // Send chat notification about request
     try {
       final userName = user.userMetadata?['full_name'] ?? 'A user';
       await ChatService.sendSystemMessage(
         poolId: poolId,
-        content: '$userName has requested to join the pool.',
+        content: '$userName has joined the pool and paid the joining fee + 1st contribution.',
         messageType: 'system_notification',
       );
     } catch (e) {

@@ -205,35 +205,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(child: Divider(color: Colors.grey.shade300)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'Or continue with',
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
-                    ),
-                    Expanded(child: Divider(color: Colors.grey.shade300)),
-                  ],
-                ),
                 const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _SocialLoginButton(
-                      icon: Icons.g_mobiledata, // Placeholder for Google
-                      label: 'Google',
-                      onTap: () {},
-                    ),
-                    _SocialLoginButton(
-                      icon: Icons.apple,
-                      label: 'Apple',
-                      onTap: () {},
-                    ),
-                  ],
-                ),
                 const SizedBox(height: 24),
                 Center(
                   child: TextButton(
