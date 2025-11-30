@@ -707,23 +707,18 @@ class _PoolPreviewSheet extends StatelessWidget {
               fontWeight: bold ? FontWeight.bold : FontWeight.normal,
             ),
           ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
-        );
-      }
-    }
+        ],
+      ),
+    );
   }
 
-  Future<void> _joinPool(BuildContext context, String inviteCode) async {
-    // Show loading indicator
+  Future<void> _sendJoinRequest(BuildContext context) async {
     if (!context.mounted) return;
     
+    final poolId = pool['id'] as String;
+    final inviteCode = pool['invite_code'] ?? '';
+
+    // Show loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -736,7 +731,7 @@ class _PoolPreviewSheet extends StatelessWidget {
               children: [
                 CircularProgressIndicator(),
                 SizedBox(height: 16),
-                Text('Sending join request...'),
+                Text('Sending request...'),
               ],
             ),
           ),
@@ -745,50 +740,48 @@ class _PoolPreviewSheet extends StatelessWidget {
     );
 
     try {
-      if (inviteCode.isEmpty) {
-        throw Exception('Invite code is missing');
-      }
-      
-      await PoolService.joinPool(pool['id'], inviteCode);
-      
+      // Call joinPool (which now only sends a request)
+      await PoolService.joinPool(poolId, inviteCode);
+
       if (context.mounted) {
         Navigator.of(context).pop(); // Close loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Join request sent! Waiting for admin approval.'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
+        
+        // Show success dialog
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Request Sent'),
+            content: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 48),
+                SizedBox(height: 16),
+                Text('Your request has been sent to the pool admin.'),
+                SizedBox(height: 8),
+                Text('You will be notified once approved. Then you can proceed to payment.', textAlign: TextAlign.center),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  context.pop(); // Close sheet (go back to list)
+                },
+                child: const Text('OK'),
+              ),
+            ],
           ),
         );
-        // Navigate to My Pools instead of pool details (user might not have access yet)
-        context.go('/my-pools');
       }
     } catch (e) {
       if (context.mounted) {
         Navigator.of(context).pop(); // Close loading dialog
         
-        // Show detailed error
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Error Joining Pool'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Failed to join the pool. Please try again.'),
-                const SizedBox(height: 12),
-                Text(
-                  'Error: $e',
-                  style: const TextStyle(fontSize: 12, color: Colors.red),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Note: Make sure you have run the SQL script (fix_join_pool.sql) in your Supabase dashboard.',
-                  style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic),
-                ),
-              ],
-            ),
+            title: const Text('Error'),
+            content: Text(e.toString().replaceAll('Exception: ', '')),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
