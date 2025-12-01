@@ -322,54 +322,20 @@ class PoolService {
       throw Exception('Insufficient balance. You need ₹${totalRequired.toStringAsFixed(2)} (₹$joiningFee Joining Fee + ₹$contributionAmount 1st Contribution) to join. Please add money.');
     }
 
-    // 1. Deduct joining fee
-    await _client.rpc('decrement_wallet_balance', params: {
-      'p_user_id': user.id,
-      'p_amount': joiningFee,
-    });
-
-    // Record joining fee transaction
-    await _client.from('transactions').insert({
-      'user_id': user.id,
-      'pool_id': poolId,
-      'transaction_type': 'joining_fee',
-      'amount': joiningFee,
-      'status': 'completed',
-      'description': 'Joining fee for ${pool['name']}',
-      'created_at': DateTime.now().toIso8601String(),
-    });
-
-    // 2. Deduct first contribution
-    final currentLocked = (wallet['locked_balance'] as num).toDouble();
+    // Use secure RPC to handle payment and activation atomically
+    try {
+      await _client.rpc('complete_join_payment', params: {
+        'p_pool_id': poolId,
+      });
+    } catch (e) {
+      debugPrint('RPC complete_join_payment failed: $e');
+      if (e.toString().contains('Insufficient balance')) {
+        throw Exception('Insufficient balance. Please add money to your wallet.');
+      }
+      rethrow;
+    }
+    // RPC handles transactions and status update
     
-    await _client.from('wallets').update({
-      'available_balance': availableBalance - totalRequired, 
-      'locked_balance': currentLocked + contributionAmount,
-    }).eq('user_id', user.id);
-
-    // Record contribution transaction
-    await _client.from('transactions').insert({
-      'user_id': user.id,
-      'pool_id': poolId,
-      'transaction_type': 'contribution',
-      'amount': contributionAmount,
-      'currency': 'INR',
-      'status': 'completed',
-      'payment_method': 'wallet',
-      'description': 'Contribution for Round 1 (Upon Joining)',
-      'metadata': {
-        'round': 1,
-        'is_joining_contribution': true,
-      },
-    });
-
-    // 3. ACTIVATE MEMBERSHIP
-    await _client
-        .from('pool_members')
-        .update({'status': 'active'})
-        .eq('pool_id', poolId)
-        .eq('user_id', user.id);
-
     // Send chat notification
     try {
       final userName = user.userMetadata?['full_name'] ?? 'A user';
