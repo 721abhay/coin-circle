@@ -286,27 +286,9 @@ class AdminService {
   /// Approve deposit request (admin only)
   static Future<void> approveDeposit(String requestId, String userId, double amount) async {
     try {
-      // 1. Update request status
-      await _client
-          .from('deposit_requests')
-          .update({'status': 'approved'})
-          .eq('id', requestId);
-
-      // 2. Credit user wallet
-      await _client.from('transactions').insert({
-        'user_id': userId,
-        'transaction_type': 'deposit',
-        'amount': amount,
-        'currency': 'INR',
-        'status': 'completed',
-        'payment_method': 'manual_transfer',
-        'description': 'Manual Deposit Approved',
-        'metadata': {'request_id': requestId},
-      });
-
-      await _client.rpc('increment_wallet_balance', params: {
-        'p_user_id': userId,
-        'p_amount': amount,
+      // Use atomic RPC
+      await _client.rpc('approve_deposit_request', params: {
+        'p_request_id': requestId,
       });
 
     } catch (e) {
