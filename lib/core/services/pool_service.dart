@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'chat_service.dart';
+import 'notification_service.dart';
 import '../config/supabase_config.dart';
 
 class PoolService {
@@ -253,13 +254,41 @@ class PoolService {
     // Send chat notification about request
     try {
       final userName = user.userMetadata?['full_name'] ?? 'A user';
+      
+      // 1. Send system message to chat
       await ChatService.sendSystemMessage(
         poolId: poolId,
         content: '$userName has requested to join the pool.',
         messageType: 'system_notification',
       );
+
+      // 2. Send notification to Pool Creator
+      // Fetch creator_id first
+      final poolData = await _client
+          .from('pools')
+          .select('creator_id, name')
+          .eq('id', poolId)
+          .single();
+      
+      final creatorId = poolData['creator_id'] as String;
+      final poolName = poolData['name'] as String;
+
+      if (creatorId != user.id) { // Don't notify self if testing
+        await NotificationService.createNotification(
+          userId: creatorId,
+          type: 'join_request',
+          title: 'New Join Request',
+          message: '$userName requested to join "$poolName"',
+          data: {
+            'pool_id': poolId,
+            'requester_id': user.id,
+            'action': 'review_request'
+          },
+        );
+      }
+
     } catch (e) {
-      debugPrint('Failed to send chat notification: $e');
+      debugPrint('Failed to send notifications: $e');
     }
   }
 
