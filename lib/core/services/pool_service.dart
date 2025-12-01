@@ -225,21 +225,29 @@ class PoolService {
     // Let's assume for this fix we use direct insert and hope RLS allows 'pending' inserts.
     
     try {
-      await _client.from('pool_members').insert({
-        'pool_id': poolId,
-        'user_id': user.id,
-        'role': 'member',
-        'status': 'pending', // Explicitly pending
-        'join_date': DateTime.now().toIso8601String(),
-      });
-    } catch (e) {
-      // If direct insert fails (RLS), try RPC but warn user
-      debugPrint('Direct join failed, trying RPC: $e');
-      await _client.rpc('join_pool_secure', params: {
+      // Try the new secure RPC first
+      await _client.rpc('request_join_pool', params: {
         'p_pool_id': poolId,
         'p_invite_code': inviteCode,
-      });
-      // We hope RPC handles it.
+      }).timeout(const Duration(seconds: 10));
+    } catch (e) {
+      debugPrint('RPC request_join_pool failed: $e');
+      // Fallback: Try direct insert if RPC is missing (dev mode)
+      if (e.toString().contains('function') && e.toString().contains('not found')) {
+         try {
+            await _client.from('pool_members').insert({
+              'pool_id': poolId,
+              'user_id': user.id,
+              'role': 'member',
+              'status': 'pending',
+              'join_date': DateTime.now().toIso8601String(),
+            });
+         } catch (insertError) {
+            throw Exception('Failed to send request. Please ensure database migrations are applied.');
+         }
+      } else {
+        rethrow; // Re-throw other errors (like invalid code)
+      }
     }
 
     // Send chat notification about request
