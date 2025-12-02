@@ -43,7 +43,7 @@ class RetryHelper {
     while (attempt < maxAttempts) {
       try {
         return await operation();
-      } catch (error, stackTrace) {
+      } catch (error) {
         lastError = error;
         attempt++;
         

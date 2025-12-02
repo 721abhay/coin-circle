@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../../../core/services/auth_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/services/pool_service.dart';
 import 'pool_chat_screen.dart';
@@ -58,6 +58,7 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Sing
 
   @override
   Widget build(BuildContext context) {
+    final isCreator = _pool?['creator_id'] == AuthService().currentUser?.id;
     return Scaffold(
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {
@@ -167,7 +168,7 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Sing
             _ScheduleTab(poolId: widget.poolId),
             _WinnersTab(poolId: widget.poolId),
             _ChatTab(poolId: widget.poolId),
-            _DocsTab(poolId: widget.poolId),
+            _DocsTab(poolId: widget.poolId, isCreator: isCreator),
             _StatsTab(poolId: widget.poolId),
           ],
         ),
@@ -263,7 +264,91 @@ class _OverviewTabState extends State<_OverviewTab> {
     );
   }
 
-  // ... _buildStatusCard and _buildInviteCodeCard remain same ...
+  Widget _buildStatusCard(BuildContext context) {
+    final status = widget.pool!['status'] ?? 'active';
+    Color color;
+    String text;
+    IconData icon;
+
+    switch (status) {
+      case 'active':
+        color = Colors.green;
+        text = 'Active';
+        icon = Icons.check_circle;
+        break;
+      case 'completed':
+        color = Colors.blue;
+        text = 'Completed';
+        icon = Icons.done_all;
+        break;
+      case 'cancelled':
+        color = Colors.red;
+        text = 'Cancelled';
+        icon = Icons.cancel;
+        break;
+      default:
+        color = Colors.grey;
+        text = 'Pending';
+        icon = Icons.hourglass_empty;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Pool Status', style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+              Text(text, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInviteCodeCard(BuildContext context) {
+    final inviteCode = widget.pool!['invite_code'] ?? 'N/A';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.purple.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.purple.shade200),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Invite Code', style: TextStyle(color: Colors.purple, fontSize: 12)),
+              const SizedBox(height: 4),
+              Text(inviteCode, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, letterSpacing: 1.5)),
+            ],
+          ),
+          IconButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: inviteCode));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Invite code copied to clipboard')),
+              );
+            },
+            icon: const Icon(Icons.copy, color: Colors.purple),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildPaymentSection(BuildContext context) {
     // 1. Handle Pending State
@@ -1008,12 +1093,12 @@ class _ChatTab extends StatelessWidget {
 
 class _DocsTab extends StatelessWidget {
   final String poolId;
+  final bool isCreator;
   
-  const _DocsTab({required this.poolId});
+  const _DocsTab({required this.poolId, required this.isCreator});
 
   @override
   Widget build(BuildContext context) {
-    final isCreator = false; // TODO: Pass this properly or fetch in screen
     return PoolDocumentsScreen(poolId: poolId, isCreator: isCreator);
   }
 }

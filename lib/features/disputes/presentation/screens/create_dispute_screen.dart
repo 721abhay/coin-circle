@@ -26,7 +26,7 @@ class _CreateDisputeScreenState extends State<CreateDisputeScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedType,
+              initialValue: _selectedType,
               decoration: const InputDecoration(
                 labelText: 'Dispute Type',
                 border: OutlineInputBorder(),

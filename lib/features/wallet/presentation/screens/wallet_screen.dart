@@ -566,7 +566,7 @@ class _WalletScreenState extends State<WalletScreen> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: selectedMethod,
+                  initialValue: selectedMethod,
                   decoration: const InputDecoration(
                     labelText: 'Withdrawal Method',
                     border: OutlineInputBorder(),

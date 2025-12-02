@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/services/admin_service.dart';
-import '../../../../core/services/wallet_management_service.dart';
 
 class AdminFinancialsView extends ConsumerStatefulWidget {
   const AdminFinancialsView({super.key});

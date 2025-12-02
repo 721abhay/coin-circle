@@ -18,7 +18,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   
   String _selectedCategory = 'Payment Issues';
   String _selectedPriority = 'Medium';
-  List<XFile> _attachments = [];
+  final List<XFile> _attachments = [];
   bool _isSubmitting = false;
 
   final List<String> _categories = [
@@ -174,7 +174,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.category),

@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../../../core/services/admin_service.dart';
-import '../../../../core/services/pool_service.dart';
-import '../../../../core/services/wallet_management_service.dart';
 
 // Import sub‑screens used in the main navigation
 import '../widgets/admin_users_view.dart';
@@ -246,7 +243,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                 labelText: 'Priority',
                 border: OutlineInputBorder(),
               ),
-              value: 'Info',
+              initialValue: 'Info',
               items: const [
                 DropdownMenuItem(value: 'Info', child: Text('Info')),
                 DropdownMenuItem(value: 'Warning', child: Text('Warning')),

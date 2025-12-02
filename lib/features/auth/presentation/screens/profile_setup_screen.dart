@@ -606,7 +606,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         ),
         value: value,
         onChanged: onChanged,
-        activeColor: const Color(0xFF6C63FF),
+        activeThumbColor: const Color(0xFF6C63FF),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(color: Colors.grey.shade300),

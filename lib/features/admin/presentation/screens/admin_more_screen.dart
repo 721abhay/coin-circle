@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/pool_service.dart';
-import '../../../../core/services/wallet_management_service.dart';
 import '../../../../core/services/admin_service.dart';
 
 // Import extra admin widgets

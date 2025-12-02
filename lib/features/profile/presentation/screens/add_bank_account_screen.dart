@@ -248,7 +248,7 @@ class _AddBankAccountScreenState extends State<AddBankAccountScreen> {
 
             // Account Type
             DropdownButtonFormField<String>(
-              value: _accountType,
+              initialValue: _accountType,
               decoration: const InputDecoration(
                 labelText: 'Account Type',
                 prefixIcon: Icon(Icons.account_balance_wallet),

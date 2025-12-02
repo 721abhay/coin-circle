@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import '../../../../core/services/wallet_management_service.dart';
 
 class BankAccountsScreen extends StatefulWidget {
@@ -872,7 +870,7 @@ class _BankAccountsScreenState extends State<BankAccountsScreen> with SingleTick
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: accountType,
+                  initialValue: accountType,
                   decoration: const InputDecoration(
                     labelText: 'Account Type',
                     border: OutlineInputBorder(),

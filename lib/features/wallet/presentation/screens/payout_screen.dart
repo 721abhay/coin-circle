@@ -232,7 +232,7 @@ class _PayoutScreenState extends State<PayoutScreen> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: _selectedBankAccountId,
+            initialValue: _selectedBankAccountId,
             decoration: const InputDecoration(border: OutlineInputBorder()),
             items: _bankAccounts.map((account) {
               return DropdownMenuItem<String>(

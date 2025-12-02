@@ -96,7 +96,7 @@ class _AdminSettingsViewState extends ConsumerState<AdminSettingsView> {
       subtitle: Text(subtitle),
       value: value,
       onChanged: onChanged,
-      activeColor: isDestructive ? Colors.red : Colors.green,
+      activeThumbColor: isDestructive ? Colors.red : Colors.green,
       contentPadding: EdgeInsets.zero,
     );
   }
@@ -156,7 +156,7 @@ class _AdminSettingsViewState extends ConsumerState<AdminSettingsView> {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                value: 'Info',
+                initialValue: 'Info',
                 items: const [
                   DropdownMenuItem(value: 'Info', child: Text('Info')),
                   DropdownMenuItem(value: 'Warning', child: Text('Warning')),

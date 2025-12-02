@@ -93,7 +93,7 @@ class GamificationService {
       });
     } catch (e) {
       debugPrint('Error joining challenge: $e');
-      throw e;
+      rethrow;
     }
   }
 

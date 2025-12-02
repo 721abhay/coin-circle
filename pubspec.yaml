@@ -47,7 +47,7 @@ dependencies:
   flutter_rating_bar: ^4.0.1
   
   # Supabase Backend
-  supabase_flutter: ^2.3.4
+  supabase_flutter: ^2.6.0
   flutter_dotenv: ^5.1.0
   
   # Security
@@ -57,6 +57,7 @@ dependencies:
   file_picker: ^10.3.7
   razorpay_flutter: ^1.4.0
 
+  path: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -12,7 +12,7 @@ class UserManagementTab extends StatefulWidget {
 
 class _UserManagementTabState extends State<UserManagementTab> {
   final TextEditingController _searchController = TextEditingController();
-  List<AdminUser> _users = [];
+  final List<AdminUser> _users = [];
   bool _isLoading = true;
   String? _error;
   int _currentPage = 0;

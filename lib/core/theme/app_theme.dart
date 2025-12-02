@@ -18,11 +18,9 @@ class AppTheme {
         primary: primaryColor,
         secondary: primaryColor,
         surface: Colors.white,
-        background: scaffoldBgColor,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onSurface: textColor,
-        onBackground: textColor,
         error: Colors.red,
         onError: Colors.white,
       ),
@@ -75,11 +73,11 @@ class AppTheme {
         side: BorderSide.none,
       ),
       switchTheme: SwitchThemeData(
-        thumbColor: MaterialStateProperty.resolveWith((states) {
-          return states.contains(MaterialState.selected) ? primaryColor : Colors.grey;
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          return states.contains(WidgetState.selected) ? primaryColor : Colors.grey;
         }),
-        trackColor: MaterialStateProperty.resolveWith((states) {
-          return states.contains(MaterialState.selected) ? primaryColor.withOpacity(0.5) : Colors.grey.shade800;
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          return states.contains(WidgetState.selected) ? primaryColor.withOpacity(0.5) : Colors.grey.shade800;
         }),
       ),
     );
@@ -96,11 +94,9 @@ class AppTheme {
         primary: primaryColor,
         secondary: primaryColor,
         surface: Color(0xFF1E1E1E),
-        background: Color(0xFF121212),
         onPrimary: Colors.white,
         onSecondary: Colors.white,
         onSurface: Colors.white,
-        onBackground: Colors.white,
         error: Colors.redAccent,
         onError: Colors.black,
       ),
@@ -153,11 +149,11 @@ class AppTheme {
         side: BorderSide.none,
       ),
       switchTheme: SwitchThemeData(
-        thumbColor: MaterialStateProperty.resolveWith((states) {
-          return states.contains(MaterialState.selected) ? primaryColor : Colors.grey;
+        thumbColor: WidgetStateProperty.resolveWith((states) {
+          return states.contains(WidgetState.selected) ? primaryColor : Colors.grey;
         }),
-        trackColor: MaterialStateProperty.resolveWith((states) {
-          return states.contains(MaterialState.selected) ? primaryColor.withOpacity(0.5) : Colors.grey.shade800;
+        trackColor: WidgetStateProperty.resolveWith((states) {
+          return states.contains(WidgetState.selected) ? primaryColor.withOpacity(0.5) : Colors.grey.shade800;
         }),
       ),
     );

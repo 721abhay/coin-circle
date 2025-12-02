@@ -309,10 +309,56 @@ class _WalletDashboardScreenState extends State<WalletDashboardScreen> {
             ),
           ),
           onTap: () {
-            // TODO: Show transaction details
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text(title),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildDetailRow('Amount', '$amountPrefix ${currencyFormatter.format(amount)}'),
+                    _buildDetailRow('Date', dateFormatter.format(date)),
+                    _buildDetailRow('Status', status.toUpperCase()),
+                    _buildDetailRow('Description', tx['description'] ?? 'No description'),
+                    if (tx['metadata'] != null) ...[
+                      const SizedBox(height: 8),
+                      const Text('Metadata:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Text(tx['metadata'].toString()),
+                    ],
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Close'),
+                  ),
+                ],
+              ),
+            );
           },
         );
       },
+    );
+  }
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+            ),
+          ),
+          Expanded(child: Text(value)),
+        ],
+      ),
     );
   }
 }

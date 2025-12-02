@@ -26,11 +26,11 @@ void main() {
             home: Scaffold(
               body: Column(
                 children: [
-                  TextFormField(key: const Key('report_subject')),
+                  TextFormField(key: Key('report_subject')),
                   ElevatedButton(
-                    key: const Key('submit_report_button'),
+                    key: Key('submit_report_button'),
                     onPressed: () {},
-                    child: const Text('Submit'),
+                    child: Text('Submit'),
                   ),
                 ],
               ),

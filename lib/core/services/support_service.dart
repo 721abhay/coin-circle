@@ -29,7 +29,7 @@ class SupportService {
       return response;
     } catch (e) {
       debugPrint('Error creating ticket: $e');
-      throw e;
+      rethrow;
     }
   }
 

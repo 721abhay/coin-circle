@@ -288,7 +288,6 @@ class WalletService {
 
     // First check balance
     final wallet = await getWallet();
-    if (wallet == null) throw Exception('Wallet not found');
     
     final double available = (wallet['available_balance'] as num).toDouble();
     final double winningBalance = (wallet['winning_balance'] as num?)?.toDouble() ?? 0.0;
@@ -386,7 +385,6 @@ class WalletService {
 
     // First check balance
     final wallet = await getWallet();
-    if (wallet == null) throw Exception('Wallet not found');
     
     final double available = (wallet['available_balance'] as num).toDouble();
     final double winningBalance = (wallet['winning_balance'] as num?)?.toDouble() ?? 0.0;
@@ -608,7 +606,6 @@ class WalletService {
 
     // First check balance
     final wallet = await getWallet();
-    if (wallet == null) throw Exception('Wallet not found');
     
     final double available = (wallet['available_balance'] as num).toDouble();
     if (available < amount) {

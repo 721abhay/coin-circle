@@ -191,7 +191,7 @@ class _BasicInfoStep extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            value: state.category,
+            initialValue: state.category,
             decoration: const InputDecoration(labelText: 'Category'),
             items: ['Family', 'Friends', 'Colleagues', 'Community'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
             onChanged: (value) {
@@ -249,7 +249,7 @@ class _FinancialDetailsStep extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           DropdownButtonFormField<String>(
-            value: state.frequency,
+            initialValue: state.frequency,
             decoration: const InputDecoration(labelText: 'Frequency'),
             items: ['Weekly', 'Bi-weekly', 'Monthly'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
             onChanged: (value) {
@@ -326,7 +326,7 @@ class _PoolRulesStep extends ConsumerWidget {
             Text('Payment Day', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             DropdownButtonFormField<int>(
-              value: state.paymentDay,
+              initialValue: state.paymentDay,
               decoration: const InputDecoration(
                 labelText: 'Day of Month',
                 border: OutlineInputBorder(),
@@ -416,7 +416,7 @@ class _PoolRulesStep extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           DropdownButtonFormField<String>(
-            value: state.winnerSelectionMethod,
+            initialValue: state.winnerSelectionMethod,
             decoration: const InputDecoration(labelText: 'Winner Selection Method'),
             items: ['Random Draw', 'Member Voting', 'Sequential Rotation'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
             onChanged: (value) {

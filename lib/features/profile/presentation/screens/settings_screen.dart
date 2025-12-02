@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:coin_circle/core/services/auth_service.dart';
 import '../../../../core/services/security_service.dart';
 import '../../../../core/providers/settings_provider.dart';
@@ -329,7 +328,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       value: value,
       onChanged: onChanged,
       contentPadding: const EdgeInsets.symmetric(horizontal: 24),
-      activeColor: Theme.of(context).primaryColor,
+      activeThumbColor: Theme.of(context).primaryColor,
     );
   }
 

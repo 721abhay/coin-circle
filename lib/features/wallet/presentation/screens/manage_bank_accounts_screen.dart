@@ -177,7 +177,7 @@ class _ManageBankAccountsScreenState extends State<ManageBankAccountsScreen> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: accountType,
+                  initialValue: accountType,
                   decoration: const InputDecoration(labelText: 'Account Type'),
                   items: const [
                     DropdownMenuItem(value: 'savings', child: Text('Savings')),

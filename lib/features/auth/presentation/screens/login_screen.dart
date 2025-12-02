@@ -17,7 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _authService = AuthService();
-  bool _obscurePassword = true;
+  final bool _obscurePassword = true;
   bool _isPasswordVisible = false;
   bool _rememberMe = false;
   bool _isLoading = false;
@@ -93,6 +93,72 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _showForgotPasswordDialog() async {
+    final emailController = TextEditingController();
+    
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Enter your email address and we\'ll send you a password reset link.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Email Address',
+                prefixIcon: Icon(Icons.email_outlined),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final email = emailController.text.trim();
+              if (email.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter your email')),
+                );
+                return;
+              }
+
+              try {
+                await _authService.resetPassword(email);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Password reset link sent! Check your email.'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Send Reset Link'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _handleGoogleSignIn() async {
     setState(() => _isLoading = true);
 
@@ -131,6 +197,8 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -229,7 +297,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const Spacer(),
                     TextButton(
                       onPressed: () {
-                        // TODO: Forgot password flow
+                        _showForgotPasswordDialog();
                       },
                       child: const Text('Forgot Password?'),
                     ),
@@ -282,48 +350,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Center(
-                  child: TextButton(
-                    onPressed: () async {
-                      try {
-                        final authenticated = await SecurityService.authenticateWithBiometric(
-                          reason: 'Login to Coin Circle',
-                        );
-                        
-                        if (authenticated && mounted) {
-                          final prefs = await SharedPreferences.getInstance();
-                          final savedEmail = prefs.getString('saved_email');
-                          
-                          if (savedEmail != null) {
-                             _emailController.text = savedEmail;
-                             ScaffoldMessenger.of(context).showSnackBar(
-                               const SnackBar(content: Text('Biometric verified. Please enter password to confirm.')),
-                             );
-                          } else {
-                             ScaffoldMessenger.of(context).showSnackBar(
-                               const SnackBar(content: Text('Biometric verified. Please enter your credentials.')),
-                             );
-                          }
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Biometric error: $e')),
-                          );
-                        }
-                      }
-                    },
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.fingerprint, color: Theme.of(context).colorScheme.primary),
-                        const SizedBox(width: 8),
-                        const Text('Login with Biometrics'),
-                      ],
                     ),
                   ),
                 ),

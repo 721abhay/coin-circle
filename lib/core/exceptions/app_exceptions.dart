@@ -24,7 +24,7 @@ abstract class AppException implements Exception {
   
   @override
   String toString() {
-    final buffer = StringBuffer('${runtimeType}: $message');
+    final buffer = StringBuffer('$runtimeType: $message');
     if (code != null) buffer.write(' (code: $code)');
     if (originalError != null) buffer.write('\nCaused by: $originalError');
     return buffer.toString();
@@ -34,16 +34,11 @@ abstract class AppException implements Exception {
 /// Exception thrown when wallet operations fail
 class WalletException extends AppException {
   WalletException(
-    String message, {
-    String? code,
-    dynamic originalError,
-    StackTrace? stackTrace,
-  }) : super(
-          message,
-          code: code,
-          originalError: originalError,
-          stackTrace: stackTrace,
-        );
+    super.message, {
+    super.code,
+    super.originalError,
+    super.stackTrace,
+  });
 }
 
 /// Exception thrown when wallet is not found
@@ -69,16 +64,11 @@ class InsufficientBalanceException extends WalletException {
 /// Exception thrown when pool operations fail
 class PoolException extends AppException {
   PoolException(
-    String message, {
-    String? code,
-    dynamic originalError,
-    StackTrace? stackTrace,
-  }) : super(
-          message,
-          code: code,
-          originalError: originalError,
-          stackTrace: stackTrace,
-        );
+    super.message, {
+    super.code,
+    super.originalError,
+    super.stackTrace,
+  });
 }
 
 /// Exception thrown when pool is not found
@@ -102,16 +92,11 @@ class AlreadyPoolMemberException extends PoolException {
 /// Exception thrown when network operations fail
 class NetworkException extends AppException {
   NetworkException(
-    String message, {
-    String? code,
-    dynamic originalError,
-    StackTrace? stackTrace,
-  }) : super(
-          message,
-          code: code,
-          originalError: originalError,
-          stackTrace: stackTrace,
-        );
+    super.message, {
+    super.code,
+    super.originalError,
+    super.stackTrace,
+  });
 }
 
 /// Exception thrown when network is unavailable
@@ -135,16 +120,11 @@ class TimeoutException extends NetworkException {
 /// Exception thrown when authentication fails
 class AuthException extends AppException {
   AuthException(
-    String message, {
-    String? code,
-    dynamic originalError,
-    StackTrace? stackTrace,
-  }) : super(
-          message,
-          code: code,
-          originalError: originalError,
-          stackTrace: stackTrace,
-        );
+    super.message, {
+    super.code,
+    super.originalError,
+    super.stackTrace,
+  });
 }
 
 /// Exception thrown when user is not authenticated
@@ -168,16 +148,11 @@ class ForbiddenException extends AuthException {
 /// Exception thrown when admin operations fail
 class AdminException extends AppException {
   AdminException(
-    String message, {
-    String? code,
-    dynamic originalError,
-    StackTrace? stackTrace,
-  }) : super(
-          message,
-          code: code,
-          originalError: originalError,
-          stackTrace: stackTrace,
-        );
+    super.message, {
+    super.code,
+    super.originalError,
+    super.stackTrace,
+  });
 }
 
 /// Exception thrown when validation fails
@@ -213,16 +188,11 @@ class CircuitBreakerOpenException extends AppException {
 /// Exception thrown when payment operations fail
 class PaymentException extends AppException {
   PaymentException(
-    String message, {
-    String? code,
-    dynamic originalError,
-    StackTrace? stackTrace,
-  }) : super(
-          message,
-          code: code,
-          originalError: originalError,
-          stackTrace: stackTrace,
-        );
+    super.message, {
+    super.code,
+    super.originalError,
+    super.stackTrace,
+  });
 }
 
 /// Exception thrown when payment is declined
@@ -243,16 +213,11 @@ class InvalidTransactionReferenceException extends PaymentException {
 /// Exception thrown when database operations fail
 class DatabaseException extends AppException {
   DatabaseException(
-    String message, {
-    String? code,
-    dynamic originalError,
-    StackTrace? stackTrace,
-  }) : super(
-          message,
-          code: code,
-          originalError: originalError,
-          stackTrace: stackTrace,
-        );
+    super.message, {
+    super.code,
+    super.originalError,
+    super.stackTrace,
+  });
 }
 
 /// Exception thrown when a required record is not found

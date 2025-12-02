@@ -218,7 +218,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('${DateFormat('MMM d, yyyy • h:mm a').format(date)}'),
+                                  Text(DateFormat('MMM d, yyyy • h:mm a').format(date)),
                                   if (transaction['pool_name'] != null)
                                     Text(
                                       'Pool: ${transaction['pool_name']}',

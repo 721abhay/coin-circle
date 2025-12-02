@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 class GoalBasedPoolScreen extends StatefulWidget {
@@ -16,7 +15,7 @@ class _GoalBasedPoolScreenState extends State<GoalBasedPoolScreen> {
   final _targetAmountController = TextEditingController();
   
   String _goalType = 'Vacation';
-  DateTime _targetDate = DateTime.now().add(const Duration(days: 365));
+  final DateTime _targetDate = DateTime.now().add(const Duration(days: 365));
   double _currentAmount = 0;
   double _targetAmount = 50000;
   
@@ -411,7 +410,7 @@ class _GoalBasedPoolScreenState extends State<GoalBasedPoolScreen> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _goalType,
+                initialValue: _goalType,
                 decoration: const InputDecoration(
                   labelText: 'Goal Type',
                   border: OutlineInputBorder(),

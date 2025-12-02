@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SpecialDistributionRequestScreen extends StatefulWidget {
@@ -213,7 +212,7 @@ class _SpecialDistributionRequestScreenState extends State<SpecialDistributionRe
             _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : DropdownButtonFormField<String>(
-                    value: _selectedMemberId,
+                    initialValue: _selectedMemberId,
                     decoration: const InputDecoration(
                       hintText: 'Choose a member',
                       prefixIcon: Icon(Icons.person),
@@ -255,7 +254,7 @@ class _SpecialDistributionRequestScreenState extends State<SpecialDistributionRe
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _selectedReason,
+              initialValue: _selectedReason,
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.category),
               ),

@@ -153,7 +153,7 @@ class _KYCSubmissionScreenState extends State<KYCSubmissionScreen> {
               const SizedBox(height: 20),
               
               DropdownButtonFormField<String>(
-                value: _selectedDocType,
+                initialValue: _selectedDocType,
                 decoration: const InputDecoration(
                   labelText: 'Document Type',
                   border: OutlineInputBorder(),

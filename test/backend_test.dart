@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:coin_circle/core/services/pool_service.dart';
 
 void main() {
   group('Backend API Tests', () {

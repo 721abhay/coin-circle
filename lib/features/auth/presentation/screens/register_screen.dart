@@ -90,7 +90,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         );
 
         if (mounted) {
-          context.push('/verify-otp?email=${Uri.encodeComponent(_emailController.text.trim())}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Account created successfully! You are now logged in.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          context.go('/home');
         }
       } on AuthException catch (e) {
         if (mounted) {
@@ -156,6 +162,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     }
   }
+
+
 
   @override
   Widget build(BuildContext context) {

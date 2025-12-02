@@ -11,7 +11,7 @@ class PoolOversightTab extends StatefulWidget {
 }
 
 class _PoolOversightTabState extends State<PoolOversightTab> {
-  List<Map<String, dynamic>> _pools = [];
+  final List<Map<String, dynamic>> _pools = [];
   bool _isLoading = true;
   String? _error;
   int _currentPage = 0;

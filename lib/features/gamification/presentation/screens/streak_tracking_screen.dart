@@ -17,7 +17,7 @@ class _StreakTrackingScreenState extends State<StreakTrackingScreen> {
   int _longestStreak = 0;
   int _totalPayments = 0;
   
-  List<Map<String, dynamic>> _streakMilestones = [
+  final List<Map<String, dynamic>> _streakMilestones = [
     {'days': 7, 'reward': '50 Points', 'achieved': false},
     {'days': 30, 'reward': '200 Points + Bronze Badge', 'achieved': false},
     {'days': 60, 'reward': '500 Points + Silver Badge', 'achieved': false},

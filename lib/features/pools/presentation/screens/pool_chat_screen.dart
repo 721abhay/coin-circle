@@ -7,7 +7,6 @@ import '../../../../core/config/supabase_config.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../../core/services/document_service.dart';
 
 class PoolChatScreen extends ConsumerStatefulWidget {
   final String poolId;

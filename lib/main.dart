@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:coin_circle/core/providers/settings_provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart'; // Added for localizations
 import 'package:coin_circle/core/l10n/app_localizations.dart'; // Localization delegate
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +17,15 @@ void main() async {
     debugPrint('✅ Supabase initialized successfully');
     // Test database setup
     await testDatabaseSetup();
+    
+    // Listen for auth state changes
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final AuthChangeEvent event = data.event;
+      if (event == AuthChangeEvent.signedIn) {
+        debugPrint('🔐 User signed in, redirecting to home...');
+        appRouter.go('/home');
+      }
+    });
   } catch (e) {
     debugPrint('❌ Error initializing Supabase: $e');
     debugPrint('⚠️  Please create a .env file with your Supabase credentials');

@@ -14,7 +14,6 @@ import 'package:coin_circle/features/profile/presentation/screens/profile_screen
 import 'package:coin_circle/features/pools/presentation/screens/create_pool_screen.dart';
 import 'package:coin_circle/features/pools/presentation/screens/pool_details_screen.dart';
 import 'package:coin_circle/features/pools/presentation/screens/join_pool_screen.dart';
-import 'package:coin_circle/features/pools/presentation/screens/pool_search_screen.dart';
 import 'package:coin_circle/features/wallet/presentation/screens/payment_screen.dart';
 import 'package:coin_circle/features/wallet/presentation/screens/transaction_history_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/notifications_screen.dart';
@@ -60,7 +59,6 @@ import 'package:coin_circle/features/debug/diagnostic_screen.dart';
 import 'package:coin_circle/features/support/presentation/screens/help_support_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/export_data_screen.dart';
 import 'package:coin_circle/features/wallet/presentation/screens/bank_accounts_screen.dart' as wallet;
-import 'package:coin_circle/features/profile/presentation/screens/terms_of_service_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/privacy_settings_screen.dart';
 import 'package:coin_circle/features/support/presentation/screens/submit_ticket_screen.dart';
 // NEW FEATURES
@@ -479,4 +477,19 @@ final appRouter = GoRouter(
       builder: (context, state) => const DatabaseTestScreen(),
     ),
   ],
+  errorBuilder: (context, state) {
+    // Handle Supabase auth callback deep link
+    if (state.uri.toString().contains('login-callback')) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    return Scaffold(
+      body: Center(
+        child: Text('Page Not Found: ${state.error}'),
+      ),
+    );
+  },
 );

@@ -103,7 +103,7 @@ class _AdminUsersViewState extends ConsumerState<AdminUsersView> {
       scrollDirection: Axis.horizontal,
       child: SingleChildScrollView(
         child: DataTable(
-        headingRowColor: MaterialStateProperty.all(Colors.grey.shade50),
+        headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
         columns: const [
           DataColumn(label: Text('User')),
           DataColumn(label: Text('Status')),

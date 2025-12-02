@@ -289,7 +289,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       subtitle: const Text('Automatically pay 3 days before due date'),
       secondary: const Icon(Icons.autorenew),
       contentPadding: EdgeInsets.zero,
-      activeColor: Theme.of(context).primaryColor,
+      activeThumbColor: Theme.of(context).primaryColor,
     );
   }
 

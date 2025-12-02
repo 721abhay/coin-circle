@@ -103,7 +103,7 @@ class _AdminPoolsViewState extends ConsumerState<AdminPoolsView> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: status,
+                  initialValue: status,
                   decoration: const InputDecoration(labelText: 'Status'),
                   items: ['pending', 'active', 'completed', 'paused']
                       .map((s) => DropdownMenuItem(value: s, child: Text(s.toUpperCase())))
@@ -112,7 +112,7 @@ class _AdminPoolsViewState extends ConsumerState<AdminPoolsView> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: privacy,
+                  initialValue: privacy,
                   decoration: const InputDecoration(labelText: 'Privacy'),
                   items: ['public', 'private']
                       .map((s) => DropdownMenuItem(value: s, child: Text(s.toUpperCase())))
