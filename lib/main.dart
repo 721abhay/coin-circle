@@ -8,9 +8,31 @@ import 'package:coin_circle/core/providers/settings_provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart'; // Added for localizations
 import 'package:coin_circle/core/l10n/app_localizations.dart'; // Localization delegate
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:coin_circle/core/services/push_notification_service.dart';
+// import 'firebase_options.dart'; // Uncomment after running 'flutterfire configure'
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Register background message handler
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  
+  // Initialize Firebase
+  try {
+    await Firebase.initializeApp(
+      // options: DefaultFirebaseOptions.currentPlatform, // Uncomment after setup
+    );
+    debugPrint('✅ Firebase initialized successfully');
+    
+    // Initialize Push Notifications
+    await PushNotificationService.initialize();
+  } catch (e) {
+    debugPrint('❌ Error initializing Firebase: $e');
+    debugPrint('⚠️  Firebase not configured yet. Push notifications will not work.');
+  }
+  
   // Initialize Supabase
   try {
     await SupabaseConfig.initialize();

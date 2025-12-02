@@ -344,8 +344,33 @@ class PoolService {
         content: '$userName has completed payment and joined the pool!',
         messageType: 'system_notification',
       );
+
+      // Notify the user
+      await NotificationService.createNotification(
+        userId: user.id,
+        type: 'pool_joined',
+        title: 'Welcome to ${pool['name']}!',
+        message: 'You have successfully joined the pool. Good luck!',
+        data: {'pool_id': poolId},
+      );
+
+      // Notify the creator/admin
+      // Fetch creator_id again (or pass it if optimized)
+      final poolData = await _client.from('pools').select('creator_id').eq('id', poolId).single();
+      final creatorId = poolData['creator_id'] as String;
+      
+      if (creatorId != user.id) {
+        await NotificationService.createNotification(
+          userId: creatorId,
+          type: 'new_member',
+          title: 'New Member Joined',
+          message: '$userName has joined ${pool['name']}.',
+          data: {'pool_id': poolId, 'member_id': user.id},
+        );
+      }
+
     } catch (e) {
-      debugPrint('Failed to send chat notification: $e');
+      debugPrint('Failed to send notifications: $e');
     }
   }
 
@@ -362,6 +387,11 @@ class PoolService {
 
   /// Approve or reject a join request
   static Future<void> respondToJoinRequest(String poolId, String userId, bool approve) async {
+    final currentUser = _client.auth.currentUser;
+    // Fetch pool name for notification
+    final pool = await _client.from('pools').select('name').eq('id', poolId).single();
+    final poolName = pool['name'] as String;
+
     if (approve) {
       // Set status to 'approved' (User must still pay to become 'active')
       await _client
@@ -370,7 +400,14 @@ class PoolService {
           .eq('pool_id', poolId)
           .eq('user_id', userId);
           
-      // We DO NOT increment pool members yet. That happens when they pay and become 'active'.
+      // Notify the user
+      await NotificationService.createNotification(
+        userId: userId,
+        type: 'request_approved',
+        title: 'Join Request Approved',
+        message: 'Your request to join "$poolName" has been approved! Please complete payment to activate your membership.',
+        data: {'pool_id': poolId, 'action': 'pay_joining_fee'},
+      );
       
     } else {
       await _client
@@ -378,6 +415,15 @@ class PoolService {
           .delete()
           .eq('pool_id', poolId)
           .eq('user_id', userId);
+
+      // Notify the user
+      await NotificationService.createNotification(
+        userId: userId,
+        type: 'request_rejected',
+        title: 'Join Request Rejected',
+        message: 'Your request to join "$poolName" was declined.',
+        data: {'pool_id': poolId},
+      );
     }
   }
 

@@ -50,6 +50,11 @@ dependencies:
   supabase_flutter: ^2.6.0
   flutter_dotenv: ^5.1.0
   
+  # Push Notifications
+  firebase_core: ^3.8.1
+  firebase_messaging: ^15.1.5
+  flutter_local_notifications: ^18.0.1
+  
   # Security
   crypto: ^3.0.3
   geolocator: ^10.1.0
