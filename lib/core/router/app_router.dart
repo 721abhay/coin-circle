@@ -42,6 +42,7 @@ import 'package:coin_circle/features/profile/presentation/screens/edit_personal_
 import 'package:coin_circle/features/profile/presentation/screens/kyc_verification_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/kyc_submission_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/privacy_controls_screen.dart';
+import 'package:coin_circle/features/kyc/presentation/screens/kyc_verification_screen.dart' as new_kyc;
 import 'package:coin_circle/features/disputes/presentation/screens/create_dispute_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/terms_of_service_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/faq_screen.dart';
@@ -80,6 +81,7 @@ import 'package:coin_circle/features/profile/presentation/screens/personal_analy
 import 'package:coin_circle/features/profile/presentation/screens/help_center_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/contact_support_screen.dart';
 import 'package:coin_circle/features/admin/presentation/screens/platform_revenue_screen.dart';
+import 'package:coin_circle/features/admin/presentation/screens/withdrawal_requests_screen.dart';
 import 'package:coin_circle/features/debug/database_test_screen.dart';
 
 
@@ -200,10 +202,16 @@ final appRouter = GoRouter(
       },
     ),
     GoRoute(
-      path: '/voting/:poolId',
+      path: '/voting/:poolId/:roundNumber',
       builder: (context, state) {
         final poolId = state.pathParameters['poolId']!;
-        return VotingScreen(poolId: poolId);
+        final roundNumber = int.parse(state.pathParameters['roundNumber']!);
+        final eligibleMembers = state.extra as List<Map<String, dynamic>>? ?? [];
+        return VotingScreen(
+          poolId: poolId,
+          roundNumber: roundNumber,
+          eligibleMembers: eligibleMembers,
+        );
       },
     ),
     GoRoute(
@@ -461,12 +469,20 @@ final appRouter = GoRouter(
       builder: (context, state) => const FinancialGoalsScreen(),
     ),
     GoRoute(
+      path: '/kyc-verification',
+      builder: (context, state) => const new_kyc.KYCVerificationScreen(),
+    ),
+    GoRoute(
       path: '/kyc-submission',
-      builder: (context, state) => const KYCSubmissionScreen(),
+      builder: (context, state) => const KYCSubmissionScreen(), // Redirects to /kyc-verification
     ),
     GoRoute(
       path: '/admin/kyc-verification',
       builder: (context, state) => const admin_kyc.KYCVerificationScreen(),
+    ),
+    GoRoute(
+      path: '/admin/withdrawal-requests',
+      builder: (context, state) => const WithdrawalRequestsScreen(),
     ),
     GoRoute(
       path: '/setup-pin',

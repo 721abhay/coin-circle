@@ -186,7 +186,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                 Icons.money_off,
                 Colors.blue,
                 () {
-                  setState(() => _selectedIndex = 3); // Navigate to Finance
+                  context.push('/admin/withdrawal-requests');
                 },
               ),
               _buildQuickActionButton(

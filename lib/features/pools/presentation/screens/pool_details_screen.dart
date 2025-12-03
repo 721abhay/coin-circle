@@ -122,10 +122,8 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Sing
                             ],
                           ),
                         ),
+                        const PopupMenuItem(value: 'divider', enabled: false, child: Divider()),
                       ],
-                      const PopupMenuItem(value: 'edit', child: Text('Edit Pool')),
-                      const PopupMenuItem(value: 'mute', child: Text('Mute Notifications')),
-                      const PopupMenuItem(value: 'leave', child: Text('Leave Pool')),
                       const PopupMenuItem(value: 'report', child: Text('Report Issue')),
                     ];
                   },
@@ -136,6 +134,11 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Sing
                       context.push('/member-management/${widget.poolId}');
                     } else if (value == 'winner_draw') {
                       context.push('/winner-selection/${widget.poolId}');
+                    } else if (value == 'report') {
+                      // Report issue functionality
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Report issue feature coming soon')),
+                      );
                     }
                   },
                 ),

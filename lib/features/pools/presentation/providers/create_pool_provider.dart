@@ -22,6 +22,7 @@ class CreatePoolState {
   final bool enableChat;
   final bool requireIdVerification;
   final DateTime? joiningDeadline;
+  final int startDrawMonth;
 
   CreatePoolState({
     this.name = '',
@@ -41,6 +42,7 @@ class CreatePoolState {
     this.enableChat = true,
     this.requireIdVerification = false,
     this.joiningDeadline,
+    this.startDrawMonth = 1,
   });
 
   CreatePoolState copyWith({
@@ -61,6 +63,7 @@ class CreatePoolState {
     bool? enableChat,
     bool? requireIdVerification,
     DateTime? joiningDeadline,
+    int? startDrawMonth,
   }) {
     return CreatePoolState(
       name: name ?? this.name,
@@ -80,6 +83,7 @@ class CreatePoolState {
       enableChat: enableChat ?? this.enableChat,
       requireIdVerification: requireIdVerification ?? this.requireIdVerification,
       joiningDeadline: joiningDeadline ?? this.joiningDeadline,
+      startDrawMonth: startDrawMonth ?? this.startDrawMonth,
     );
   }
 }
@@ -104,4 +108,5 @@ class CreatePoolNotifier extends StateNotifier<CreatePoolState> {
   void updateEnableChat(bool enable) => state = state.copyWith(enableChat: enable);
   void updateIdVerification(bool require) => state = state.copyWith(requireIdVerification: require);
   void updateJoiningDeadline(DateTime date) => state = state.copyWith(joiningDeadline: date);
+  void updateStartDrawMonth(int month) => state = state.copyWith(startDrawMonth: month);
 }

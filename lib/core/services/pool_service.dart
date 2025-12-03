@@ -22,9 +22,21 @@ class PoolService {
     required int durationMonths,
     required int paymentDay, // Day of month for payment (1-28)
     required double joiningFee, // One-time joining fee
+    Map<String, dynamic>? rules, // Custom rules (e.g., draw schedule)
+    bool enableChat = true, // Enable chat for this pool
+    bool requireKyc = false, // Require KYC verification to join
   }) async {
     final user = _client.auth.currentUser;
     if (user == null) throw const AuthException('User not logged in');
+
+    // 🛑 KYC CHECK: Must be KYC verified to create pools
+    final canParticipate = await _client.rpc('can_participate_in_pools', params: {
+      'p_user_id': user.id,
+    });
+    
+    if (canParticipate == false) {
+      throw Exception('KYC verification required. Please complete your KYC verification to create pools.');
+    }
 
     // 🛑 LIMIT CHECK: Max 2 created pools per user
     final createdPoolsCount = await _client
@@ -61,6 +73,9 @@ class PoolService {
       'invite_code': inviteCode,
       'payment_day': paymentDay, // Day of month for payment
       'joining_fee': joiningFee, // One-time joining fee
+      'rules': rules, // Store custom rules
+      'enable_chat': enableChat, // Chat setting
+      'require_kyc': requireKyc, // KYC requirement
     }).select().single();
 
     // CRITICAL FIX: Add creator as a member of the pool immediately
@@ -133,7 +148,7 @@ class PoolService {
     // Fetch latest winner
     final winnerResponse = await _client
         .from('winner_history')
-        .select('*, profiles(*)') // Fetch profile of the winner
+        .select('*, profiles!winner_history_user_id_fkey(*)') // Fetch profile of the winner explicitly
         .eq('pool_id', poolId)
         .order('round_number', ascending: false)
         .limit(1)
@@ -569,7 +584,7 @@ class PoolService {
   static Future<List<Map<String, dynamic>>> getWinnerHistory(String poolId) async {
     final response = await _client
         .from('winner_history')
-        .select('*, profiles(full_name, avatar_url)')
+        .select('*, profiles!winner_history_user_id_fkey(full_name, avatar_url)')
         .eq('pool_id', poolId)
         .order('round_number', ascending: false);
     

@@ -64,6 +64,68 @@ class WinnerService {
     }
   }
 
+  /// Select winner based on pool's configured method
+  static Future<void> selectWinner(String poolId, int round) async {
+    try {
+      // Get pool's winner selection method from rules
+      final pool = await _client
+          .from('pools')
+          .select('rules')
+          .eq('id', poolId)
+          .single();
+      
+      // Extract winner_selection_method from rules or default to 'Random Draw'
+      final rules = pool['rules'] as Map<String, dynamic>?;
+      final selectionMethod = rules?['winner_selection_method'] as String? ?? 'Random Draw';
+      
+      // Call appropriate RPC based on method
+      String rpcFunction;
+      switch (selectionMethod) {
+        case 'Sequential Rotation':
+          rpcFunction = 'select_sequential_winner';
+          break;
+        case 'Member Voting':
+          rpcFunction = 'select_voted_winner';
+          break;
+        case 'Random Draw':
+        default:
+          rpcFunction = 'select_random_winner';
+          break;
+      }
+      
+      await _client.rpc(rpcFunction, params: {
+        'p_pool_id': poolId,
+        'p_round_number': round,
+      });
+
+      // Send chat notification
+      try {
+        final winner = await _client
+            .from('winner_history')
+            .select('*, profiles(full_name)')
+            .eq('pool_id', poolId)
+            .eq('round_number', round)
+            .order('created_at', ascending: false)
+            .limit(1)
+            .single();
+
+        final winnerName = winner['profiles']?['full_name'] ?? 'A member';
+        final amount = (winner['winning_amount'] as num?)?.toDouble() ?? 0.0;
+
+        await ChatService.sendWinnerAnnouncement(
+          poolId: poolId,
+          winnerName: winnerName,
+          amount: amount,
+        );
+      } catch (e) {
+        debugPrint('Failed to send winner announcement: $e');
+      }
+    } catch (e) {
+      debugPrint('Error selecting winner: $e');
+      rethrow;
+    }
+  }
+  
   /// Trigger random winner selection (Admin/System function - exposed for testing/demo)
   static Future<void> selectRandomWinner(String poolId, int round) async {
     try {
@@ -74,7 +136,6 @@ class WinnerService {
 
       // Send chat notification
       try {
-        // Fetch the winner to get their name and amount
         final winner = await _client
             .from('winner_history')
             .select('*, profiles(full_name)')
@@ -83,7 +144,7 @@ class WinnerService {
             .single();
 
         final winnerName = winner['profiles']['full_name'] ?? 'A member';
-        final amount = (winner['amount_won'] as num).toDouble();
+        final amount = (winner['winning_amount'] as num?)?.toDouble() ?? 0.0;
 
         await ChatService.sendWinnerAnnouncement(
           poolId: poolId,
@@ -109,7 +170,6 @@ class WinnerService {
 
       // Send chat notification
       try {
-        // Fetch the winner to get their name and amount
         final winner = await _client
             .from('winner_history')
             .select('*, profiles(full_name)')
@@ -118,7 +178,7 @@ class WinnerService {
             .single();
 
         final winnerName = winner['profiles']['full_name'] ?? 'A member';
-        final amount = (winner['amount_won'] as num).toDouble();
+        final amount = (winner['winning_amount'] as num?)?.toDouble() ?? 0.0;
 
         await ChatService.sendWinnerAnnouncement(
           poolId: poolId,

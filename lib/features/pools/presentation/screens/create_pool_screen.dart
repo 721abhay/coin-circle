@@ -29,7 +29,7 @@ class _CreatePoolScreenState extends ConsumerState<CreatePoolScreen> {
       body: Column(
         children: [
           LinearProgressIndicator(
-            value: (_currentStep + 1) / 5,
+            value: (_currentStep + 1) / 4,
             backgroundColor: Colors.grey.shade200,
             color: Theme.of(context).primaryColor,
           ),
@@ -41,7 +41,6 @@ class _CreatePoolScreenState extends ConsumerState<CreatePoolScreen> {
                 _BasicInfoStep(onNext: _nextStep),
                 _FinancialDetailsStep(onNext: _nextStep, onBack: _prevStep),
                 _PoolRulesStep(onNext: _nextStep, onBack: _prevStep),
-                _AdditionalSettingsStep(onNext: _nextStep, onBack: _prevStep),
                 _ReviewStep(onPublish: _publishPool, onBack: _prevStep),
               ],
             ),
@@ -52,7 +51,7 @@ class _CreatePoolScreenState extends ConsumerState<CreatePoolScreen> {
   }
 
   void _nextStep() {
-    if (_currentStep < 4) {
+    if (_currentStep < 3) {
       setState(() => _currentStep++);
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
@@ -108,6 +107,12 @@ class _CreatePoolScreenState extends ConsumerState<CreatePoolScreen> {
         type: 'standard', // Default type
         paymentDay: state.paymentDay, // Day of month for payment
         joiningFee: joiningFee, // Auto-calculated joining fee
+        rules: {
+          'start_draw_month': state.startDrawMonth,
+          'winner_selection_method': state.winnerSelectionMethod,
+        },
+        enableChat: true, // Always enabled
+        requireKyc: true, // Always required for safety
       );
 
       if (mounted) {
@@ -206,15 +211,55 @@ class _BasicInfoStep extends ConsumerWidget {
   }
 }
 
-class _FinancialDetailsStep extends ConsumerWidget {
+class _FinancialDetailsStep extends ConsumerStatefulWidget {
   final VoidCallback onNext;
   final VoidCallback onBack;
 
   const _FinancialDetailsStep({required this.onNext, required this.onBack});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_FinancialDetailsStep> createState() => _FinancialDetailsStepState();
+}
+
+class _FinancialDetailsStepState extends ConsumerState<_FinancialDetailsStep> {
+  late TextEditingController _amountController;
+  late TextEditingController _durationController;
+
+  @override
+  void initState() {
+    super.initState();
+    final state = ref.read(createPoolProvider);
+    _amountController = TextEditingController(text: state.amount.toString());
+    _durationController = TextEditingController(text: state.duration.toString());
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _durationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(createPoolProvider);
+    
+    // Auto-enforce minimum start month (50% rule)
+    final minStartMonth = (state.duration * 0.5).ceil();
+    if (state.startDrawMonth < minStartMonth) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(createPoolProvider.notifier).updateStartDrawMonth(minStartMonth);
+      });
+    }
+    
+    // Update controllers when state changes (from Apply buttons)
+    if (_amountController.text != state.amount.toString()) {
+      _amountController.text = state.amount.toString();
+    }
+    if (_durationController.text != state.duration.toString()) {
+      _durationController.text = state.duration.toString();
+    }
+    
     final totalAmount = state.amount * state.duration * state.maxMembers;
 
     return SingleChildScrollView(
@@ -233,39 +278,179 @@ class _FinancialDetailsStep extends ConsumerWidget {
                 label: Text('₹$amount'),
                 selected: state.amount == amount,
                 onSelected: (selected) {
-                  if (selected) ref.read(createPoolProvider.notifier).updateAmount(amount.toDouble());
+                  if (selected) {
+                    ref.read(createPoolProvider.notifier).updateAmount(amount.toDouble());
+                    _amountController.text = amount.toString();
+                  }
                 },
               );
             }).toList(),
           ),
           const SizedBox(height: 8),
           TextFormField(
-            initialValue: state.amount.toString(),
+            controller: _amountController,
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(labelText: 'Custom Amount', prefixText: '₹'),
             onChanged: (value) {
-              if (value.isNotEmpty) ref.read(createPoolProvider.notifier).updateAmount(double.tryParse(value) ?? 0);
+              if (value.isNotEmpty) {
+                ref.read(createPoolProvider.notifier).updateAmount(double.tryParse(value) ?? 0);
+              }
             },
           ),
           const SizedBox(height: 24),
           DropdownButtonFormField<String>(
             initialValue: state.frequency,
             decoration: const InputDecoration(labelText: 'Frequency'),
-            items: ['Weekly', 'Bi-weekly', 'Monthly'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+            items: ['Monthly'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
             onChanged: (value) {
               if (value != null) ref.read(createPoolProvider.notifier).updateFrequency(value);
             },
           ),
           const SizedBox(height: 16),
           TextFormField(
-            initialValue: state.duration.toString(),
+            controller: _durationController,
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(labelText: 'Duration (Cycles)'),
             onChanged: (value) {
-              if (value.isNotEmpty) ref.read(createPoolProvider.notifier).updateDuration(int.tryParse(value) ?? 10);
+              if (value.isNotEmpty) {
+                ref.read(createPoolProvider.notifier).updateDuration(int.tryParse(value) ?? 10);
+              }
             },
           ),
           const SizedBox(height: 24),
+          Text('Maximum Members: ${state.maxMembers}', style: Theme.of(context).textTheme.titleMedium),
+          Slider(
+            value: state.maxMembers.toDouble(),
+            min: 2,
+            max: 15,
+            divisions: 13,
+            label: state.maxMembers.toString(),
+            onChanged: (value) => ref.read(createPoolProvider.notifier).updateMaxMembers(value.toInt()),
+          ),
+          const SizedBox(height: 24),
+          // Validation Warning with Solutions
+          if (state.duration < state.maxMembers) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade300, width: 2),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.warning_amber, color: Colors.orange.shade700, size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Attention: ${state.maxMembers} members in ${state.duration} months',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.orange.shade900),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'With current settings, only ${state.duration} members can win. Choose a solution:',
+                    style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+                  ),
+                  const SizedBox(height: 12),
+                  // Solution 1: Increase Duration
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '✓ Solution 1: Increase Duration',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green.shade700),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Set Duration to ${state.maxMembers} months (everyone wins ₹${NumberFormat('#,###').format(state.amount * state.maxMembers)} each)',
+                          style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                        ),
+                        const SizedBox(height: 6),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            ref.read(createPoolProvider.notifier).updateDuration(state.maxMembers);
+                            _durationController.text = state.maxMembers.toString();
+                          },
+                          icon: const Icon(Icons.auto_fix_high, size: 16),
+                          label: const Text('Apply', style: TextStyle(fontSize: 12)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Solution 2: Increase Contribution
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '✓ Solution 2: Increase Contribution',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blue.shade700),
+                        ),
+                        const SizedBox(height: 4),
+                        Builder(
+                          builder: (context) {
+                            final requiredContribution = (state.maxMembers / state.duration) * state.amount;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Increase contribution to ₹${NumberFormat('#,###').format(requiredContribution.ceil())}/month',
+                                  style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                                ),
+                                Text(
+                                  '(Each winner gets ₹${NumberFormat('#,###').format((requiredContribution * state.maxMembers).ceil())})',
+                                  style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                                ),
+                                const SizedBox(height: 6),
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    final newAmount = requiredContribution.ceilToDouble();
+                                    ref.read(createPoolProvider.notifier).updateAmount(newAmount);
+                                    _amountController.text = newAmount.toStringAsFixed(0);
+                                  },
+                                  icon: const Icon(Icons.auto_fix_high, size: 16),
+                                  label: const Text('Apply', style: TextStyle(fontSize: 12)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -283,9 +468,9 @@ class _FinancialDetailsStep extends ConsumerWidget {
           const SizedBox(height: 32),
           Row(
             children: [
-              Expanded(child: OutlinedButton(onPressed: onBack, child: const Text('Back'))),
+              Expanded(child: OutlinedButton(onPressed: widget.onBack, child: const Text('Back'))),
               const SizedBox(width: 16),
-              Expanded(child: ElevatedButton(onPressed: onNext, child: const Text('Next'))),
+              Expanded(child: ElevatedButton(onPressed: widget.onNext, child: const Text('Next'))),
             ],
           ),
         ],
@@ -309,16 +494,6 @@ class _PoolRulesStep extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Pool Rules', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 24),
-          Text('Maximum Members: ${state.maxMembers}', style: Theme.of(context).textTheme.titleMedium),
-          Slider(
-            value: state.maxMembers.toDouble(),
-            min: 2,
-            max: 50,
-            divisions: 48,
-            label: state.maxMembers.toString(),
-            onChanged: (value) => ref.read(createPoolProvider.notifier).updateMaxMembers(value.toInt()),
-          ),
           const SizedBox(height: 24),
           
           // Payment Day - Only for Monthly pools
@@ -424,6 +599,91 @@ class _PoolRulesStep extends ConsumerWidget {
             },
           ),
           const SizedBox(height: 24),
+          Text('Draw Schedule', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.purple.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.purple.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Start Draws From Month:'),
+                      Row(
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              // 60% Accumulation, 40% Distribution
+                              // Example: 10 months -> Start Month 7 (6 months wait)
+                              // Example: 5 months -> Start Month 4 (3 months wait)
+                              final startMonth = (state.duration * 0.6).ceil() + 1;
+                              ref.read(createPoolProvider.notifier).updateStartDrawMonth(startMonth.clamp(1, state.duration));
+                            },
+                            child: const Text('Apply 60/40 Rule', style: TextStyle(fontSize: 12)),
+                          ),
+                          Text('${state.startDrawMonth}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ],
+                  ),
+                Slider(
+                  value: state.startDrawMonth.toDouble(),
+                  min: ((state.duration * 0.5).ceil()).toDouble().clamp(1, state.duration.toDouble()), // Minimum 50% accumulation
+                  max: state.duration.toDouble(),
+                  divisions: state.duration > 1 ? (state.duration - ((state.duration * 0.5).ceil()) + 1).clamp(1, state.duration) : 1,
+                  label: 'Month ${state.startDrawMonth}',
+                  onChanged: (value) => ref.read(createPoolProvider.notifier).updateStartDrawMonth(value.toInt()),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue.shade700, size: 16),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Minimum start month enforced: ${((state.duration * 0.5).ceil())} (50% accumulation period)',
+                          style: TextStyle(fontSize: 11, color: Colors.blue.shade800),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Projected Draw Schedule:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      const SizedBox(height: 4),
+                      Text(
+                        _calculateDrawSchedule(state.maxMembers, state.duration, state.startDrawMonth),
+                        style: TextStyle(fontSize: 12, color: Colors.purple.shade900),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
           SwitchListTile(
             title: const Text('Private Pool'),
             subtitle: const Text('Only people with the link can join'),
@@ -460,24 +720,39 @@ class _AdditionalSettingsStep extends ConsumerWidget {
         children: [
           Text('Additional Settings', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
           const SizedBox(height: 24),
-          Text('Emergency Fund Allocation: ${state.emergencyFund.toInt()}%', style: Theme.of(context).textTheme.titleMedium),
-          Slider(
-            value: state.emergencyFund,
-            min: 0,
-            max: 20,
-            divisions: 20,
-            label: '${state.emergencyFund.toInt()}%',
-            onChanged: (value) => ref.read(createPoolProvider.notifier).updateEmergencyFund(value),
-          ),
           SwitchListTile(
             title: const Text('Enable Chat'),
+            subtitle: const Text('Allow members to communicate within the pool'),
             value: state.enableChat,
             onChanged: (value) => ref.read(createPoolProvider.notifier).updateEnableChat(value),
           ),
+          const Divider(),
           SwitchListTile(
-            title: const Text('Require ID Verification'),
+            title: const Text('Require KYC Verification'),
+            subtitle: const Text('Only KYC-verified users can join this pool (recommended for safety)'),
             value: state.requireIdVerification,
             onChanged: (value) => ref.read(createPoolProvider.notifier).updateIdVerification(value),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.green.shade200),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.verified_user, color: Colors.green.shade700, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'KYC verification helps prevent fraud and ensures all members are verified. Users can complete KYC in Profile > KYC Verification.',
+                    style: TextStyle(fontSize: 12, color: Colors.green.shade800),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 32),
           Row(
@@ -565,4 +840,31 @@ class _ReviewStep extends ConsumerWidget {
       ),
     );
   }
+}
+
+String _calculateDrawSchedule(int totalMembers, int duration, int startMonth) {
+  if (startMonth > duration) return 'Invalid Schedule';
+  
+  final schedule = <String>[];
+  int remainingWinners = totalMembers;
+  
+  // Accumulation phase
+  if (startMonth > 1) {
+    schedule.add('Months 1-${startMonth - 1}: No draws (Accumulation)');
+  }
+  
+  // Distribution phase
+  for (int month = startMonth; month <= duration; month++) {
+    int remainingMonths = duration - month + 1;
+    if (remainingMonths == 0) break;
+    
+    int winnersThisMonth = (remainingWinners / remainingMonths).ceil();
+    // Ensure we don't take more than available
+    if (winnersThisMonth > remainingWinners) winnersThisMonth = remainingWinners;
+    
+    schedule.add('Month $month: $winnersThisMonth winner${winnersThisMonth > 1 ? 's' : ''}');
+    remainingWinners -= winnersThisMonth;
+  }
+  
+  return schedule.join('\n');
 }
