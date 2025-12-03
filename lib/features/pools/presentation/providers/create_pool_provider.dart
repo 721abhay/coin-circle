@@ -31,8 +31,8 @@ class CreatePoolState {
     this.image = '',
     this.amount = 100,
     this.frequency = 'Monthly',
-    this.duration = 10,
-    this.maxMembers = 10,
+    this.duration = 6,
+    this.maxMembers = 6,
     this.isPrivate = true,
     this.paymentDay = 1, // Default to 1st of month
     this.lateFee = 5.0,
@@ -97,7 +97,20 @@ class CreatePoolNotifier extends StateNotifier<CreatePoolState> {
   void updateImage(String image) => state = state.copyWith(image: image);
   void updateAmount(double amount) => state = state.copyWith(amount: amount);
   void updateFrequency(String frequency) => state = state.copyWith(frequency: frequency);
-  void updateDuration(int duration) => state = state.copyWith(duration: duration);
+  void updateDuration(int duration) {
+    // Ensure duration is at least 3
+    final validDuration = duration < 3 ? 3 : duration;
+    
+    // Auto-adjust maxMembers if it exceeds new duration
+    // In a chit fund, maxMembers should not exceed duration
+    final maxAllowed = validDuration.clamp(3, 15);
+    final adjustedMaxMembers = state.maxMembers > maxAllowed ? maxAllowed : state.maxMembers;
+    
+    state = state.copyWith(
+      duration: validDuration,
+      maxMembers: adjustedMaxMembers,
+    );
+  }
   void updateMaxMembers(int maxMembers) => state = state.copyWith(maxMembers: maxMembers);
   void updatePrivacy(bool isPrivate) => state = state.copyWith(isPrivate: isPrivate);
   void updatePaymentDay(int day) => state = state.copyWith(paymentDay: day);
