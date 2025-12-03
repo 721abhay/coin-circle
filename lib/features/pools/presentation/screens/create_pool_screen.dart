@@ -310,10 +310,19 @@ class _FinancialDetailsStepState extends ConsumerState<_FinancialDetailsStep> {
           TextFormField(
             controller: _durationController,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Duration (Cycles)'),
+            decoration: const InputDecoration(
+              labelText: 'Duration (Cycles)',
+              helperText: 'Minimum 3 cycles recommended',
+            ),
             onChanged: (value) {
               if (value.isNotEmpty) {
-                ref.read(createPoolProvider.notifier).updateDuration(int.tryParse(value) ?? 10);
+                final newDuration = int.tryParse(value) ?? 10;
+                // Enforce minimum of 3 cycles for a viable pool
+                final validDuration = newDuration < 3 ? 3 : newDuration;
+                if (validDuration != newDuration) {
+                  _durationController.text = validDuration.toString();
+                }
+                ref.read(createPoolProvider.notifier).updateDuration(validDuration);
               }
             },
           ),
@@ -321,10 +330,17 @@ class _FinancialDetailsStepState extends ConsumerState<_FinancialDetailsStep> {
           Text('Maximum Members: ${state.maxMembers}', style: Theme.of(context).textTheme.titleMedium),
           Builder(
             builder: (context) {
+              // Ensure duration is at least 3
+              final safeDuration = state.duration < 3 ? 3 : state.duration;
+              
               // In a chit fund, max members should equal duration (1 winner per cycle)
               // But allow flexibility up to 15 for other pool types
-              final maxAllowed = state.duration.clamp(2, 15);
-              final currentValue = state.maxMembers.toDouble().clamp(2.0, maxAllowed.toDouble());
+              final maxAllowed = safeDuration.clamp(3, 15);
+              
+              // Ensure current value is within valid range
+              final safeMin = 2.0;
+              final safeMax = maxAllowed.toDouble();
+              final currentValue = state.maxMembers.toDouble().clamp(safeMin, safeMax);
               
               // Auto-adjust if current value exceeds max
               if (state.maxMembers > maxAllowed) {
@@ -333,11 +349,14 @@ class _FinancialDetailsStepState extends ConsumerState<_FinancialDetailsStep> {
                 });
               }
               
+              // Ensure we have valid divisions (at least 1)
+              final divisionCount = (maxAllowed - 2).clamp(1, 13);
+              
               return Slider(
                 value: currentValue,
-                min: 2,
-                max: maxAllowed.toDouble(),
-                divisions: maxAllowed > 2 ? maxAllowed - 2 : 1,
+                min: safeMin,
+                max: safeMax,
+                divisions: divisionCount,
                 label: currentValue.toInt().toString(),
                 onChanged: (value) => ref.read(createPoolProvider.notifier).updateMaxMembers(value.toInt()),
               );
