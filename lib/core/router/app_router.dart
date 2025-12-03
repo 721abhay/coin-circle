@@ -25,13 +25,13 @@ import 'package:coin_circle/features/pools/presentation/screens/special_distribu
 import 'package:coin_circle/features/wallet/presentation/screens/payment_methods_screen.dart';
 import 'package:coin_circle/features/wallet/presentation/screens/withdraw_funds_screen.dart';
 import 'package:coin_circle/features/wallet/presentation/screens/add_money_screen.dart';
-import 'package:coin_circle/features/gamification/presentation/screens/leaderboard_screen.dart';
+import 'package:coin_circle/features/gamification/presentation/screens/reputation_leaderboard_screen.dart';
 import 'package:coin_circle/features/gamification/presentation/screens/referral_screen.dart';
 import 'package:coin_circle/features/gamification/presentation/screens/friend_list_screen.dart';
 import 'package:coin_circle/features/gamification/presentation/screens/review_list_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/community_support_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/feedback_screen.dart';
-import 'package:coin_circle/features/profile/presentation/screens/public_profile_screen.dart';
+import 'package:coin_circle/features/profile/presentation/screens/public_profile_screen_new.dart';
 import 'package:coin_circle/features/gamification/presentation/screens/create_review_screen.dart';
 import 'package:coin_circle/features/gamification/presentation/screens/community_feed_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/security_settings_screen.dart';
@@ -232,7 +232,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/leaderboard',
-      builder: (context, state) => const LeaderboardScreen(),
+      builder: (context, state) => const ReputationLeaderboardScreen(),
     ),
     GoRoute(
       path: '/referral',

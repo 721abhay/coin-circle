@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/services/pool_service.dart';
+import '../../../../core/services/voting_service.dart';
 import 'pool_chat_screen.dart';
 import 'pool_documents_screen.dart';
 import 'pool_statistics_screen.dart';
@@ -194,6 +195,7 @@ class _OverviewTabState extends State<_OverviewTab> {
   List<Map<String, dynamic>> _recentWinners = [];
   List<Map<String, dynamic>> _userTransactions = [];
   String? _membershipStatus;
+  Map<String, dynamic>? _votingPeriod;
 
   @override
   void initState() {
@@ -229,11 +231,23 @@ class _OverviewTabState extends State<_OverviewTab> {
             .maybeSingle();
       }
 
+      // Check voting status
+      final startDate = DateTime.parse(widget.pool!['start_date']);
+      final now = DateTime.now();
+      final daysSinceStart = now.difference(startDate).inDays;
+      final currentRound = ((daysSinceStart / 30).floor() + 1).clamp(1, widget.pool!['total_rounds'] as int);
+      
+      final votingPeriod = await VotingService.getVotingPeriod(
+        poolId: poolId, 
+        roundNumber: currentRound
+      );
+
       if (mounted) {
         setState(() {
           _recentWinners = winners.take(2).toList();
           _userTransactions = transactions;
           _membershipStatus = membership?['status'];
+          _votingPeriod = votingPeriod;
         });
       }
     } catch (e) {
@@ -251,6 +265,8 @@ class _OverviewTabState extends State<_OverviewTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_votingPeriod != null && _votingPeriod!['status'] == 'open')
+            _buildVotingBanner(context),
           _buildStatusCard(context),
           const SizedBox(height: 24),
           _buildInviteCodeCard(context),
@@ -262,6 +278,80 @@ class _OverviewTabState extends State<_OverviewTab> {
           _buildContributionSchedule(context),
           const SizedBox(height: 24),
           _buildWinnerHistory(context),
+        ],
+      ),
+    );
+  }
+
+
+
+  Widget _buildVotingBanner(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.purple.shade700, Colors.purple.shade500],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.purple.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.how_to_vote, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Voting is Open!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Cast your vote for this round\'s winner.',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final round = _votingPeriod!['round_number'];
+              context.push('/voting/${widget.pool!['id']}/$round');
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.purple,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+            child: const Text('Vote Now'),
+          ),
         ],
       ),
     );
@@ -580,9 +670,15 @@ class _OverviewTabState extends State<_OverviewTab> {
                 final status = member['status'] ?? 'active';
                 final avatarUrl = profile['avatar_url'];
 
-                return Padding(
-                  padding: const EdgeInsets.only(right: 16.0),
-                  child: Column(
+                return GestureDetector(
+                  onTap: () {
+                    if (member['user_id'] != null) {
+                      context.push('/profile/${member['user_id']}');
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 16.0),
+                    child: Column(
                     children: [
                       Stack(
                         children: [
@@ -886,21 +982,28 @@ class _MembersTabState extends State<_MembersTab> {
             final name = profile['full_name'] ?? 'Member ${i + 1}';
             final status = member['status'] ?? 'active';
             
-            return Column(
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Colors.primaries[i % Colors.primaries.length],
-                  child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'M', style: const TextStyle(color: Colors.white)),
-                ),
-                const SizedBox(height: 4),
-                Text(name, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
-                Icon(
-                  status == 'active' ? Icons.check_circle : Icons.access_time, 
-                  size: 16, 
-                  color: status == 'active' ? Colors.green : Colors.orange
-                ),
-              ],
+            return GestureDetector(
+              onTap: () {
+                if (member['user_id'] != null) {
+                  context.push('/profile/${member['user_id']}');
+                }
+              },
+              child: Column(
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.primaries[i % Colors.primaries.length],
+                    child: Text(name.isNotEmpty ? name[0].toUpperCase() : 'M', style: const TextStyle(color: Colors.white)),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(name, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                  Icon(
+                    status == 'active' ? Icons.check_circle : Icons.access_time, 
+                    size: 16, 
+                    color: status == 'active' ? Colors.green : Colors.orange
+                  ),
+                ],
+              ),
             );
           },
         ),
