@@ -15,27 +15,27 @@ class KYCService {
 
     // Check if already submitted
     final existing = await _supabase
-        .from('kyc_requests')
+        .from('kyc_documents')
         .select()
         .eq('user_id', user.id)
         .maybeSingle();
 
     if (existing != null) {
-      if (existing['status'] == 'pending') {
+      if (existing['verification_status'] == 'pending') {
         throw const AuthException('KYC verification is already in progress');
-      } else if (existing['status'] == 'approved') {
+      } else if (existing['verification_status'] == 'approved') {
         throw const AuthException('KYC is already approved');
       }
     }
 
     // Insert or Update
-    await _supabase.from('kyc_requests').upsert({
+    await _supabase.from('kyc_documents').upsert({
       'user_id': user.id,
-      'full_name': fullName,
+      // 'full_name': fullName, // kyc_documents doesn't have full_name, it's in profiles
       'document_type': documentType,
       'document_number': documentNumber,
       'document_url': documentUrl,
-      'status': 'pending',
+      'verification_status': 'pending',
       'submitted_at': DateTime.now().toIso8601String(),
     });
   }
@@ -46,7 +46,7 @@ class KYCService {
     if (user == null) return null;
 
     final response = await _supabase
-        .from('kyc_requests')
+        .from('kyc_documents')
         .select()
         .eq('user_id', user.id)
         .maybeSingle();
@@ -56,22 +56,33 @@ class KYCService {
 
   /// Get all pending KYC requests (Admin only)
   static Future<List<Map<String, dynamic>>> getPendingKYCRequests() async {
-    final response = await _supabase
-        .from('kyc_requests')
-        .select('*, profiles(email, avatar_url)')
-        .eq('status', 'pending')
-        .order('submitted_at', ascending: false);
-    
-    return List<Map<String, dynamic>>.from(response);
+    try {
+      final response = await _supabase
+          .from('kyc_documents')
+          .select('*, profiles(email, avatar_url, full_name)')
+          .eq('verification_status', 'pending')
+          .order('submitted_at', ascending: false);
+      
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      // Fallback if profiles join fails
+      print('Error fetching KYC requests with profiles: $e');
+      final response = await _supabase
+          .from('kyc_documents')
+          .select()
+          .eq('verification_status', 'pending')
+          .order('submitted_at', ascending: false);
+      return List<Map<String, dynamic>>.from(response);
+    }
   }
 
   /// Approve KYC request
   static Future<void> approveKYC(String userId) async {
     // 1. Update KYC request status
     await _supabase
-        .from('kyc_requests')
+        .from('kyc_documents')
         .update({
-          'status': 'approved',
+          'verification_status': 'approved',
           'verified_at': DateTime.now().toIso8601String(),
         })
         .eq('user_id', userId);
@@ -79,19 +90,31 @@ class KYCService {
     // 2. Update user profile to verified
     await _supabase
         .from('profiles')
-        .update({'is_verified': true})
+        .update({
+          'is_verified': true,
+          'kyc_verified': true, // Update both flags to be safe
+        })
         .eq('id', userId);
   }
 
   /// Reject KYC request
   static Future<void> rejectKYC(String userId, String reason) async {
     await _supabase
-        .from('kyc_requests')
+        .from('kyc_documents')
         .update({
-          'status': 'rejected',
+          'verification_status': 'rejected',
           'rejection_reason': reason,
           'verified_at': DateTime.now().toIso8601String(),
         })
         .eq('user_id', userId);
+        
+    // Ensure profile is not verified
+    await _supabase
+        .from('profiles')
+        .update({
+          'is_verified': false,
+          'kyc_verified': false,
+        })
+        .eq('id', userId);
   }
 }
