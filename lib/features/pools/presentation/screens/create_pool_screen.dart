@@ -632,13 +632,31 @@ class _PoolRulesStep extends ConsumerWidget {
                       ),
                     ],
                   ),
-                Slider(
-                  value: state.startDrawMonth.toDouble(),
-                  min: ((state.duration * 0.5).ceil()).toDouble().clamp(1, state.duration.toDouble()), // Minimum 50% accumulation
-                  max: state.duration.toDouble(),
-                  divisions: state.duration > 1 ? (state.duration - ((state.duration * 0.5).ceil()) + 1).clamp(1, state.duration) : 1,
-                  label: 'Month ${state.startDrawMonth}',
-                  onChanged: (value) => ref.read(createPoolProvider.notifier).updateStartDrawMonth(value.toInt()),
+                Builder(
+                  builder: (context) {
+                    final double duration = state.duration.toDouble();
+                    final double minStart = (duration * 0.5).ceilToDouble().clamp(1.0, duration);
+                    final double maxStart = duration;
+                    
+                    // Ensure value is within valid range
+                    final double currentValue = state.startDrawMonth.toDouble().clamp(minStart, maxStart);
+                    
+                    // Auto-adjust if current value is invalid
+                    if (state.startDrawMonth < minStart || state.startDrawMonth > maxStart) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        ref.read(createPoolProvider.notifier).updateStartDrawMonth(currentValue.toInt());
+                      });
+                    }
+
+                    return Slider(
+                      value: currentValue,
+                      min: minStart,
+                      max: maxStart,
+                      divisions: (maxStart - minStart).toInt() > 0 ? (maxStart - minStart).toInt() : 1,
+                      label: 'Month ${currentValue.toInt()}',
+                      onChanged: (value) => ref.read(createPoolProvider.notifier).updateStartDrawMonth(value.toInt()),
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
                 Container(

@@ -97,7 +97,21 @@ class CreatePoolNotifier extends StateNotifier<CreatePoolState> {
   void updateImage(String image) => state = state.copyWith(image: image);
   void updateAmount(double amount) => state = state.copyWith(amount: amount);
   void updateFrequency(String frequency) => state = state.copyWith(frequency: frequency);
-  void updateDuration(int duration) => state = state.copyWith(duration: duration);
+  void updateDuration(int duration) {
+    // Ensure startDrawMonth is valid for new duration
+    // Min start month is 50% of duration
+    final minStart = (duration * 0.5).ceil();
+    final maxStart = duration;
+    
+    int newStartMonth = state.startDrawMonth;
+    if (newStartMonth < minStart) newStartMonth = minStart;
+    if (newStartMonth > maxStart) newStartMonth = maxStart;
+    
+    state = state.copyWith(
+      duration: duration,
+      startDrawMonth: newStartMonth,
+    );
+  }
   void updateMaxMembers(int maxMembers) => state = state.copyWith(maxMembers: maxMembers);
   void updatePrivacy(bool isPrivate) => state = state.copyWith(isPrivate: isPrivate);
   void updatePaymentDay(int day) => state = state.copyWith(paymentDay: day);
