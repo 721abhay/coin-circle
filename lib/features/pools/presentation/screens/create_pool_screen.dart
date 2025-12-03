@@ -319,13 +319,29 @@ class _FinancialDetailsStepState extends ConsumerState<_FinancialDetailsStep> {
           ),
           const SizedBox(height: 24),
           Text('Maximum Members: ${state.maxMembers}', style: Theme.of(context).textTheme.titleMedium),
-          Slider(
-            value: state.maxMembers.toDouble(),
-            min: 2,
-            max: 15,
-            divisions: 13,
-            label: state.maxMembers.toString(),
-            onChanged: (value) => ref.read(createPoolProvider.notifier).updateMaxMembers(value.toInt()),
+          Builder(
+            builder: (context) {
+              // In a chit fund, max members should equal duration (1 winner per cycle)
+              // But allow flexibility up to 15 for other pool types
+              final maxAllowed = state.duration.clamp(2, 15);
+              final currentValue = state.maxMembers.toDouble().clamp(2.0, maxAllowed.toDouble());
+              
+              // Auto-adjust if current value exceeds max
+              if (state.maxMembers > maxAllowed) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  ref.read(createPoolProvider.notifier).updateMaxMembers(maxAllowed);
+                });
+              }
+              
+              return Slider(
+                value: currentValue,
+                min: 2,
+                max: maxAllowed.toDouble(),
+                divisions: maxAllowed > 2 ? maxAllowed - 2 : 1,
+                label: currentValue.toInt().toString(),
+                onChanged: (value) => ref.read(createPoolProvider.notifier).updateMaxMembers(value.toInt()),
+              );
+            },
           ),
           const SizedBox(height: 24),
           // Validation Warning with Solutions
