@@ -718,7 +718,8 @@ class _OverviewTabState extends State<_OverviewTab> {
                       ),
                     ],
                   ),
-                );
+                ),
+              );
               },
             ),
           ),
