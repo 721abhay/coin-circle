@@ -31,8 +31,8 @@ class CreatePoolState {
     this.image = '',
     this.amount = 100,
     this.frequency = 'Monthly',
-    this.duration = 6,
-    this.maxMembers = 6,
+    this.duration = 10,
+    this.maxMembers = 10,
     this.isPrivate = true,
     this.paymentDay = 1, // Default to 1st of month
     this.lateFee = 5.0,
