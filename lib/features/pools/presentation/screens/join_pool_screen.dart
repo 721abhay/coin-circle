@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/services/pool_service.dart';
+import '../../../../features/legal/presentation/widgets/legal_agreement_dialog.dart';
 
 class JoinPoolScreen extends StatefulWidget {
   const JoinPoolScreen({super.key});
@@ -669,17 +670,35 @@ class _PoolPreviewSheet extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () async {
-              Navigator.of(dialogContext).pop(); // Close dialog
-              Navigator.of(context).pop(); // Close sheet
-              await _sendJoinRequest(context);
+            onPressed: () {
+              Navigator.of(dialogContext).pop(); // Close confirmation dialog
+              _showLegalAgreement(context);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF6C63FF),
             ),
-            child: const Text('Send Request'),
+            child: const Text('Proceed to Sign'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showLegalAgreement(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => LegalAgreementDialog(
+        poolId: pool['id'],
+        poolName: pool['name'],
+        contributionAmount: (pool['contribution_amount'] as num).toDouble(),
+        totalRounds: pool['total_rounds'],
+        paymentSchedule: pool['frequency'] ?? 'Monthly',
+        onSigned: () async {
+          Navigator.pop(context); // Close agreement dialog
+          Navigator.of(context).pop(); // Close sheet
+          await _sendJoinRequest(context);
+        },
       ),
     );
   }

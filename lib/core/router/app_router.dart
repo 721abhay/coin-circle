@@ -83,6 +83,7 @@ import 'package:coin_circle/features/profile/presentation/screens/contact_suppor
 import 'package:coin_circle/features/admin/presentation/screens/platform_revenue_screen.dart';
 import 'package:coin_circle/features/admin/presentation/screens/withdrawal_requests_screen.dart';
 import 'package:coin_circle/features/debug/database_test_screen.dart';
+import 'package:coin_circle/features/legal/presentation/screens/user_legal_notices_screen.dart';
 
 
 
@@ -364,6 +365,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/settings/privacy',
       builder: (context, state) => const PrivacyControlsScreen(),
+    ),
+    GoRoute(
+      path: '/legal-notices',
+      builder: (context, state) => const UserLegalNoticesScreen(),
     ),
     GoRoute(
       path: '/disputes/create/:poolId',

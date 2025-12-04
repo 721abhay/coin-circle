@@ -9,6 +9,7 @@ import '../widgets/analytics_tab.dart';
 import '../widgets/pool_oversight_tab.dart';
 import '../widgets/user_management_tab.dart';
 import '../../data/models/platform_stats.dart';
+import 'admin_legal_screen.dart';
 
 /// Screen that hosts additional admin features not shown in the main bottom navigation.
 class AdminMoreScreen extends ConsumerStatefulWidget {
@@ -25,8 +26,8 @@ class _AdminMoreScreenState extends ConsumerState<AdminMoreScreen>
   @override
   void initState() {
     super.initState();
-    // Five extra tabs
-    _tabController = TabController(length: 5, vsync: this);
+    // Six extra tabs
+    _tabController = TabController(length: 6, vsync: this);
   }
 
   @override
@@ -53,6 +54,7 @@ class _AdminMoreScreenState extends ConsumerState<AdminMoreScreen>
             Tab(icon: Icon(Icons.analytics), text: 'Analytics'),
             Tab(icon: Icon(Icons.layers), text: 'Pool Oversight'),
             Tab(icon: Icon(Icons.group), text: 'User Mgmt'),
+            Tab(icon: Icon(Icons.gavel), text: 'Legal'),
           ],
         ),
       ),
@@ -86,6 +88,7 @@ class _AdminMoreScreenState extends ConsumerState<AdminMoreScreen>
           ),
           const PoolOversightTab(),
           const UserManagementTab(),
+          const AdminLegalTab(),
         ],
       ),
     );

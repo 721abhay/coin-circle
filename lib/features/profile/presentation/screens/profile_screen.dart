@@ -484,6 +484,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             children: [
               _buildMenuItem(context, 'Verify Identity (KYC)', Icons.verified_user, () => context.push('/kyc-submission')),
               const Divider(height: 1, indent: 56),
+              _buildMenuItem(context, 'Legal Notices', Icons.gavel, () => context.push('/legal-notices')),
+              const Divider(height: 1, indent: 56),
               _buildMenuItem(context, 'Edit Profile', Icons.edit, () async {
                 final result = await context.push('/profile/edit-personal-details');
                 if (result == true) {
