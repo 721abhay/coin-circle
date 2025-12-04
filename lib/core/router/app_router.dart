@@ -196,6 +196,14 @@ final appRouter = GoRouter(
       builder: (context, state) => const SettingsScreen(),
     ),
     GoRoute(
+      path: '/kyc-submission',
+      builder: (context, state) => const KYCSubmissionScreen(),
+    ),
+    GoRoute(
+      path: '/kyc-verification',
+      builder: (context, state) => const new_kyc.KYCVerificationScreen(),
+    ),
+    GoRoute(
       path: '/winner-selection/:poolId',
       builder: (context, state) {
         final poolId = state.pathParameters['poolId']!;
