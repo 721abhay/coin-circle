@@ -39,10 +39,8 @@ import 'package:coin_circle/features/profile/presentation/screens/bank_accounts_
 import 'package:coin_circle/features/profile/presentation/screens/add_bank_account_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/personal_details_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/edit_personal_details_screen.dart';
-import 'package:coin_circle/features/profile/presentation/screens/kyc_verification_screen.dart';
-import 'package:coin_circle/features/profile/presentation/screens/kyc_submission_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/privacy_controls_screen.dart';
-import 'package:coin_circle/features/kyc/presentation/screens/kyc_verification_screen.dart' as new_kyc;
+import 'package:coin_circle/features/kyc/presentation/screens/kyc_verification_screen.dart';
 import 'package:coin_circle/features/disputes/presentation/screens/create_dispute_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/terms_of_service_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/faq_screen.dart';
@@ -197,11 +195,11 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/kyc-submission',
-      builder: (context, state) => const KYCSubmissionScreen(),
+      builder: (context, state) => const KYCVerificationScreen(),
     ),
     GoRoute(
       path: '/kyc-verification',
-      builder: (context, state) => const new_kyc.KYCVerificationScreen(),
+      builder: (context, state) => const KYCVerificationScreen(),
     ),
     GoRoute(
       path: '/winner-selection/:poolId',
