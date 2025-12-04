@@ -57,22 +57,51 @@ class KYCService {
   /// Get all pending KYC requests (Admin only)
   static Future<List<Map<String, dynamic>>> getPendingKYCRequests() async {
     try {
-      final response = await _supabase
-          .from('kyc_documents')
-          .select('*, profiles(email, avatar_url, full_name)')
-          .eq('verification_status', 'pending')
-          .order('submitted_at', ascending: false);
-      
-      return List<Map<String, dynamic>>.from(response);
-    } catch (e) {
-      // Fallback if profiles join fails
-      print('Error fetching KYC requests with profiles: $e');
-      final response = await _supabase
+      // Fetch KYC documents
+      final kycDocs = await _supabase
           .from('kyc_documents')
           .select()
           .eq('verification_status', 'pending')
           .order('submitted_at', ascending: false);
-      return List<Map<String, dynamic>>.from(response);
+      
+      final List<Map<String, dynamic>> result = [];
+      
+      // Fetch profile data for each KYC document
+      for (var doc in kycDocs) {
+        try {
+          final profile = await _supabase
+              .from('profiles')
+              .select('email, avatar_url, full_name')
+              .eq('id', doc['user_id'])
+              .maybeSingle();
+          
+          // Combine KYC doc with profile data
+          result.add({
+            ...doc,
+            'profiles': profile ?? {
+              'email': 'Unknown',
+              'avatar_url': null,
+              'full_name': 'Unknown User',
+            },
+          });
+        } catch (e) {
+          // If profile fetch fails, add doc without profile data
+          result.add({
+            ...doc,
+            'profiles': {
+              'email': 'Unknown',
+              'avatar_url': null,
+              'full_name': 'Unknown User',
+            },
+          });
+        }
+      }
+      
+      return result;
+    } catch (e) {
+      print('Error fetching KYC requests: $e');
+      // Return empty list on error
+      return [];
     }
   }
 
