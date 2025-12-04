@@ -37,11 +37,18 @@ class _KYCVerificationScreenState extends State<KYCVerificationScreen> {
   }
   
   Future<void> _loadKYCStatus() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
+    
     try {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) {
-        setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() {
+            _kycStatus = null;
+            _isLoading = false;
+          });
+        }
         return;
       }
       
@@ -51,16 +58,26 @@ class _KYCVerificationScreenState extends State<KYCVerificationScreen> {
           .eq('user_id', userId)
           .limit(1);
       
-      if (mounted) {
-        setState(() {
-          if (response != null && response.isNotEmpty) {
-            _kycStatus = response[0]['verification_status'];
+      if (!mounted) return;
+      
+      setState(() {
+        try {
+          if (response != null && response is List && response.isNotEmpty) {
+            final firstItem = response[0];
+            if (firstItem != null && firstItem is Map) {
+              _kycStatus = firstItem['verification_status']?.toString();
+            } else {
+              _kycStatus = null;
+            }
           } else {
             _kycStatus = null;
           }
-          _isLoading = false;
-        });
-      }
+        } catch (e) {
+          debugPrint('Error parsing KYC status: $e');
+          _kycStatus = null;
+        }
+        _isLoading = false;
+      });
     } catch (e) {
       debugPrint('Error loading KYC status: $e');
       if (mounted) {
