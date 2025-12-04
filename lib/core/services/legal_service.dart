@@ -47,14 +47,13 @@ class LegalService {
           .from('legal_agreements')
           .select('*')
           .eq('user_id', user.id)
-          .eq('is_active', true)
-          .order('signed_at', ascending: false);
+          .eq('is_active', true);
 
       if (poolId != null) {
         query = query.eq('pool_id', poolId);
       }
 
-      final response = await query;
+      final response = await query.order('signed_at', ascending: false);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('Error fetching agreements: $e');
@@ -101,14 +100,13 @@ class LegalService {
       var query = _client
           .from('legal_notices')
           .select('*')
-          .eq('user_id', user.id)
-          .order('issued_at', ascending: false);
+          .eq('user_id', user.id);
 
       if (status != null) {
         query = query.eq('status', status);
       }
 
-      final response = await query;
+      final response = await query.order('issued_at', ascending: false);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('Error fetching legal notices: $e');
@@ -210,8 +208,7 @@ class LegalService {
       var query = _client
           .from('legal_actions')
           .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', ascending: false);
+          .eq('user_id', user.id);
 
       if (actionType != null) {
         query = query.eq('action_type', actionType);
@@ -220,7 +217,7 @@ class LegalService {
         query = query.eq('action_status', status);
       }
 
-      final response = await query;
+      final response = await query.order('created_at', ascending: false);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('Error fetching legal actions: $e');
@@ -240,8 +237,7 @@ class LegalService {
       var query = _client
           .from('enforcement_escalations')
           .select('*')
-          .eq('user_id', user.id)
-          .order('triggered_at', ascending: false);
+          .eq('user_id', user.id);
 
       if (poolId != null) {
         query = query.eq('pool_id', poolId);
@@ -250,7 +246,7 @@ class LegalService {
         query = query.eq('is_resolved', resolved);
       }
 
-      final response = await query;
+      final response = await query.order('triggered_at', ascending: false);
       return List<Map<String, dynamic>>.from(response);
     } catch (e) {
       debugPrint('Error fetching escalations: $e');

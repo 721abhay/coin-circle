@@ -40,26 +40,34 @@ class _KYCVerificationScreenState extends State<KYCVerificationScreen> {
     setState(() => _isLoading = true);
     try {
       final userId = _supabase.auth.currentUser?.id;
-      if (userId == null) return;
+      if (userId == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
       
       final response = await _supabase
           .from('kyc_documents')
           .select('verification_status')
           .eq('user_id', userId)
-          .maybeSingle();
+          .limit(1);
       
       if (mounted) {
         setState(() {
-          _kycStatus = response?['verification_status'];
+          if (response != null && response.isNotEmpty) {
+            _kycStatus = response[0]['verification_status'];
+          } else {
+            _kycStatus = null;
+          }
           _isLoading = false;
         });
       }
     } catch (e) {
+      debugPrint('Error loading KYC status: $e');
       if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading KYC status: $e')),
-        );
+        setState(() {
+          _kycStatus = null;
+          _isLoading = false;
+        });
       }
     }
   }
