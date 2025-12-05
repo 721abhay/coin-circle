@@ -74,8 +74,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             ScaleTransition(
               scale: _scaleAnimation,
               child: Container(
-                width: 120,
-                height: 120,
+                width: 200,
+                height: 200,
                 decoration: BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
@@ -87,17 +87,21 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     ),
                   ],
                 ),
-                child: Icon(
-                  Icons.savings_rounded,
-                  size: 60,
-                  color: Theme.of(context).colorScheme.primary,
+                child: ClipOval(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Image.asset(
+                      'assets/images/app_logo.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: 24),
             FadeInUp(
               child: Text(
-                'Coin Circle',
+                'Win Pool',
                 style: Theme.of(context).textTheme.displaySmall?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,

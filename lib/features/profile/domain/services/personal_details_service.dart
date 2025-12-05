@@ -117,11 +117,17 @@ class PersonalDetailsService {
   // Verify phone number (send OTP)
   Future<void> sendPhoneVerificationOTP(String phoneNumber) async {
     try {
-      // TODO: Integrate with OTP service
-      // For now, just update the phone number
-      await updateContactDetails(phoneNumber: phoneNumber);
+      // Trigger OTP by updating user attributes
+      // This requires SMS provider to be configured in Supabase
+      await _supabase.auth.updateUser(
+        UserAttributes(phone: phoneNumber),
+      );
     } catch (e) {
       debugPrint('Error sending phone OTP: $e');
+      // If SMS is not configured, we might want to simulate it for development
+      if (e.toString().contains('SMS provider not configured')) {
+        throw Exception('SMS provider not configured. Please contact support.');
+      }
       rethrow;
     }
   }
@@ -132,8 +138,14 @@ class PersonalDetailsService {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) throw Exception('User not authenticated');
 
-      // TODO: Verify OTP with service
-      // For now, just mark as verified
+      // Verify OTP with Supabase
+      await _supabase.auth.verifyOTP(
+        token: otp,
+        type: OtpType.phoneChange,
+        phone: phoneNumber,
+      );
+      
+      // Update profile status
       await _supabase
           .from('profiles')
           .update({

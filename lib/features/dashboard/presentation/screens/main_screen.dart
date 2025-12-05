@@ -22,12 +22,23 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _checkAdminStatus() async {
-    final isAdmin = await AdminService.isAdmin();
-    if (mounted) {
-      setState(() {
-        _isAdmin = isAdmin;
-        _isLoading = false;
-      });
+    try {
+      final isAdmin = await AdminService.isAdmin();
+      debugPrint('Admin status check: $isAdmin');
+      if (mounted) {
+        setState(() {
+          _isAdmin = isAdmin;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking admin status: $e');
+      if (mounted) {
+        setState(() {
+          _isAdmin = false; // Default to false on error
+          _isLoading = false;
+        });
+      }
     }
   }
 

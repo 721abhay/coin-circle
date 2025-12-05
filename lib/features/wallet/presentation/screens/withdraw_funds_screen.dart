@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
 import '../../../../core/services/wallet_management_service.dart';
+import '../../../../core/services/security_service.dart';
 
 class WithdrawFundsScreen extends StatefulWidget {
   const WithdrawFundsScreen({super.key});
@@ -107,17 +108,32 @@ class _WithdrawFundsScreenState extends State<WithdrawFundsScreen> {
   }
 
   Future<void> _sendSmsCode() async {
-    // Simulate sending SMS code
-    setState(() => _smsCodeSent = true);
-    
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Verification code sent to your phone'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      _showSmsVerificationDialog();
+    try {
+      // Send OTP via SecurityService
+      final otp = await SecurityService.sendWithdrawalOTP();
+      
+      // In production, this OTP is sent via SMS/Email.
+      // For development/demo, we show it in a snackbar or log it.
+      debugPrint('Development OTP: $otp');
+      
+      setState(() => _smsCodeSent = true);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Verification code sent! (Dev: $otp)'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+        _showSmsVerificationDialog();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sending OTP: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -159,10 +175,22 @@ class _WithdrawFundsScreenState extends State<WithdrawFundsScreen> {
             child: const Text('Resend Code'),
           ),
           ElevatedButton(
-            onPressed: () {
-              if (_smsCodeController.text.length == 6) {
-                Navigator.pop(context);
-                _processWithdrawal();
+            onPressed: () async {
+              final code = _smsCodeController.text.trim();
+              if (code.length == 6) {
+                final isValid = await SecurityService.verifyWithdrawalOTP(code);
+                if (isValid) {
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    _processWithdrawal();
+                  }
+                } else {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Invalid OTP'), backgroundColor: Colors.red),
+                    );
+                  }
+                }
               }
             },
             child: const Text('Verify'),
@@ -423,7 +451,7 @@ class _WithdrawFundsScreenState extends State<WithdrawFundsScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Expected Arrival:', style: TextStyle(color: Colors.grey)),
-                Text('2-3 business days', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('2-3 business days', style: const TextStyle(fontWeight: FontWeight.bold)),
               ],
             ),
           ],

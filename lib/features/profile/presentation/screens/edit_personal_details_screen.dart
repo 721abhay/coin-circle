@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import '../../domain/services/personal_details_service.dart';
 
 class EditPersonalDetailsScreen extends StatefulWidget {
   const EditPersonalDetailsScreen({super.key});
@@ -30,6 +31,8 @@ class _EditPersonalDetailsScreenState extends State<EditPersonalDetailsScreen> {
   final _emergencyPhoneController = TextEditingController();
 
   DateTime? _selectedDateOfBirth;
+  String? _initialPhone;
+  final _personalDetailsService = PersonalDetailsService();
 
   @override
   void initState() {
@@ -68,7 +71,8 @@ class _EditPersonalDetailsScreenState extends State<EditPersonalDetailsScreen> {
       if (mounted) {
         setState(() {
           _fullNameController.text = profile['full_name'] ?? '';
-          _phoneController.text = profile['phone'] ?? '';
+          _phoneController.text = profile['phone_number'] ?? '';
+          _initialPhone = profile['phone_number'];
           _addressController.text = profile['address'] ?? '';
           _cityController.text = profile['city'] ?? '';
           _stateController.text = profile['state'] ?? '';
@@ -100,6 +104,13 @@ class _EditPersonalDetailsScreenState extends State<EditPersonalDetailsScreen> {
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Check if phone number changed
+    final newPhone = _phoneController.text.trim();
+    if (newPhone.isNotEmpty && newPhone != _initialPhone) {
+      final verified = await _handlePhoneVerification(newPhone);
+      if (!verified) return;
+    }
+
     setState(() => _isSaving = true);
 
     try {
@@ -115,7 +126,7 @@ class _EditPersonalDetailsScreenState extends State<EditPersonalDetailsScreen> {
         'full_name': fullName,
         'first_name': firstName,
         'last_name': lastName,
-        'phone': _phoneController.text.trim(),
+        'phone_number': _phoneController.text.trim(),
         'address': _addressController.text.trim(),
         'city': _cityController.text.trim(),
         'state': _stateController.text.trim(),
@@ -151,6 +162,45 @@ class _EditPersonalDetailsScreenState extends State<EditPersonalDetailsScreen> {
       if (mounted) {
         setState(() => _isSaving = false);
       }
+    }
+  }
+
+  Future<bool> _handlePhoneVerification(String newPhone) async {
+    try {
+      setState(() => _isSaving = true);
+      
+      // Send OTP
+      await _personalDetailsService.sendPhoneVerificationOTP(newPhone);
+      
+      if (!mounted) return false;
+      setState(() => _isSaving = false);
+
+      // Show OTP Dialog
+      final otp = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => _OtpVerificationDialog(phone: newPhone),
+      );
+
+      if (otp == null) return false; // Cancelled
+
+      setState(() => _isSaving = true);
+      
+      // Verify OTP
+      await _personalDetailsService.verifyPhoneOTP(newPhone, otp);
+      
+      return true;
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Verification failed: $e'), 
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return false;
     }
   }
 
@@ -416,6 +466,74 @@ class _EditPersonalDetailsScreenState extends State<EditPersonalDetailsScreen> {
           color: Theme.of(context).primaryColor,
         ),
       ),
+    );
+  }
+}
+
+class _OtpVerificationDialog extends StatefulWidget {
+  final String phone;
+
+  const _OtpVerificationDialog({required this.phone});
+
+  @override
+  State<_OtpVerificationDialog> createState() => _OtpVerificationDialogState();
+}
+
+class _OtpVerificationDialogState extends State<_OtpVerificationDialog> {
+  final _otpController = TextEditingController();
+  bool _isValid = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _otpController.addListener(() {
+      setState(() {
+        _isValid = _otpController.text.trim().length == 6;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _otpController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Verify Phone Number'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('Enter the 6-digit OTP sent to ${widget.phone}'),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _otpController,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 24, letterSpacing: 8),
+            decoration: const InputDecoration(
+              hintText: '000000',
+              counterText: '',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isValid
+              ? () => Navigator.of(context).pop(_otpController.text.trim())
+              : null,
+          child: const Text('Verify'),
+        ),
+      ],
     );
   }
 }

@@ -11,7 +11,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:coin_circle/core/services/push_notification_service.dart';
-// import 'firebase_options.dart'; // Uncomment after running 'flutterfire configure'
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +22,7 @@ void main() async {
   // Initialize Firebase
   try {
     await Firebase.initializeApp(
-      // options: DefaultFirebaseOptions.currentPlatform, // Uncomment after setup
+      options: DefaultFirebaseOptions.currentPlatform,
     );
     debugPrint('✅ Firebase initialized successfully');
     
@@ -62,7 +62,7 @@ class CoinCircleApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
     return MaterialApp.router(
-      title: 'Coin Circle',
+      title: 'Win Pool',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
       darkTheme: AppTheme.darkTheme,

@@ -67,7 +67,7 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> with Sing
           _profile = profile;
           _userName = profile['full_name'] ?? 'User';
           _email = user.email ?? 'Not provided';
-          _phoneNumber = profile['phone'] ?? 'Not provided';
+          _phoneNumber = profile['phone_number'] ?? 'Not provided';
           _address = _buildFullAddress(profile);
           _dateOfBirth = _formatDate(profile['date_of_birth']);
           _panNumber = profile['pan_number'] ?? 'Not provided';
@@ -136,7 +136,7 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> with Sing
     int filledFields = 0;
     
     if (profile['full_name'] != null && profile['full_name'].toString().isNotEmpty) filledFields++;
-    if (profile['phone'] != null && profile['phone'].toString().isNotEmpty) filledFields++;
+    if (profile['phone_number'] != null && profile['phone_number'].toString().isNotEmpty) filledFields++;
     if (profile['address'] != null && profile['address'].toString().isNotEmpty) filledFields++;
     if (profile['date_of_birth'] != null) filledFields++;
     if (profile['pan_number'] != null && profile['pan_number'].toString().isNotEmpty) filledFields++;
@@ -311,11 +311,19 @@ class _PersonalDetailsScreenState extends State<PersonalDetailsScreen> with Sing
                 width: 70,
                 height: 70,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
                 ),
-                child: const Icon(Icons.person, color: Colors.white, size: 36),
+                child: CircleAvatar(
+                  radius: 35,
+                  backgroundColor: Colors.white.withOpacity(0.2),
+                  backgroundImage: _profile?['avatar_url'] != null && _profile!['avatar_url'].toString().isNotEmpty
+                      ? NetworkImage('${_profile!['avatar_url']}?t=${DateTime.now().millisecondsSinceEpoch}')
+                      : null,
+                  child: (_profile?['avatar_url'] == null || _profile!['avatar_url'].toString().isEmpty)
+                      ? const Icon(Icons.person, color: Colors.white, size: 36)
+                      : null,
+                ),
               ),
               const SizedBox(width: 20),
               Expanded(

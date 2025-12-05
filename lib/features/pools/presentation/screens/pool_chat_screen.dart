@@ -28,12 +28,49 @@ class _PoolChatScreenState extends ConsumerState<PoolChatScreen> {
   List<Map<String, dynamic>> _messages = [];
   bool _isLoading = true;
   bool _isSending = false;
+  bool _canChat = false;
 
   @override
   void initState() {
     super.initState();
+    _checkPermissions();
     _loadMessages();
     _subscribeToMessages();
+  }
+
+  Future<void> _checkPermissions() async {
+    final userId = SupabaseConfig.currentUserId;
+    if (userId == null) return;
+
+    try {
+      // Check if creator
+      final pool = await Supabase.instance.client
+          .from('pools')
+          .select('creator_id')
+          .eq('id', widget.poolId)
+          .single();
+      
+      if (pool['creator_id'] == userId) {
+        if (mounted) setState(() => _canChat = true);
+        return;
+      }
+
+      // Check member status
+      final member = await Supabase.instance.client
+          .from('pool_members')
+          .select('status')
+          .eq('pool_id', widget.poolId)
+          .eq('user_id', userId)
+          .maybeSingle();
+      
+      if (member != null && (member['status'] == 'active' || member['status'] == 'approved')) {
+        if (mounted) setState(() => _canChat = true);
+      } else {
+        if (mounted) setState(() => _canChat = false);
+      }
+    } catch (e) {
+      debugPrint('Error checking permissions: $e');
+    }
   }
 
   @override
@@ -45,14 +82,28 @@ class _PoolChatScreenState extends ConsumerState<PoolChatScreen> {
 
   Future<void> _loadMessages() async {
     try {
-      // Subscribe to the stream instead of loading once
-      setState(() => _isLoading = false);
+      final messages = await ChatService.getMessages(widget.poolId);
+      if (mounted) {
+        setState(() {
+          _messages = messages.map((msg) => {
+            'id': msg.id,
+            'message': msg.content,
+            'sender_id': msg.userId,
+            'created_at': msg.createdAt.toIso8601String(),
+            'profiles': {
+              'full_name': msg.userName ?? 'Unknown',
+              'avatar_url': msg.userAvatar,
+            },
+            'metadata': msg.metadata,
+          }).toList();
+          _isLoading = false;
+        });
+        _scrollToBottom();
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading messages: $e')),
-        );
+        debugPrint('Error loading messages: $e');
       }
     }
   }
@@ -71,6 +122,7 @@ class _PoolChatScreenState extends ConsumerState<PoolChatScreen> {
               'full_name': msg.userName ?? 'Unknown',
               'avatar_url': msg.userAvatar,
             },
+            'metadata': msg.metadata,
           }).toList();
         });
         _scrollToBottom();
@@ -94,20 +146,40 @@ class _PoolChatScreenState extends ConsumerState<PoolChatScreen> {
     final message = _messageController.text.trim();
     if (message.isEmpty || _isSending) return;
 
-    setState(() => _isSending = true);
+    // Optimistic UI update
+    final tempMessage = {
+      'id': 'temp-${DateTime.now().millisecondsSinceEpoch}',
+      'message': message,
+      'sender_id': SupabaseConfig.currentUserId,
+      'created_at': DateTime.now().toIso8601String(),
+      'profiles': {
+        'full_name': 'You',
+        'avatar_url': null,
+      },
+    };
+
+    setState(() {
+      _messages.add(tempMessage);
+      _isSending = true;
+    });
     _messageController.clear();
+    _scrollToBottom();
 
     try {
       await ChatService.sendMessage(
         poolId: widget.poolId,
         content: message,
       );
-      _scrollToBottom();
+      // No need to scroll here, optimistic update handled it
     } catch (e) {
+      // Remove temp message on failure
+      setState(() {
+        _messages.removeWhere((m) => m['id'] == tempMessage['id']);
+      });
       if (mounted) {
         String errorMessage = 'Failed to send message';
         if (e.toString().contains('row-level security') || e.toString().contains('42501')) {
-          errorMessage = 'You do not have permission to send messages in this pool.';
+          errorMessage = 'Permission denied. You must be a member or the creator to chat.';
         } else {
           errorMessage = 'Error: ${e.toString().replaceAll('Exception: ', '')}';
         }
@@ -190,9 +262,10 @@ class _PoolChatScreenState extends ConsumerState<PoolChatScreen> {
                             message: message['message'] ?? '',
                             isMe: isMe,
                             senderName: message['profiles']?['full_name'] ?? 'Unknown',
-                            timestamp: DateTime.parse(message['created_at']),
+                            timestamp: DateTime.parse(message['created_at']).toLocal(),
                             showAvatar: showAvatar,
                             avatarUrl: message['profiles']?['avatar_url'],
+                            metadata: message['metadata'],
                           );
                         },
                       ),
@@ -233,6 +306,19 @@ class _PoolChatScreenState extends ConsumerState<PoolChatScreen> {
   }
 
   Widget _buildMessageInput() {
+    if (!_canChat && !_isLoading) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        color: Colors.grey.shade100,
+        child: const Center(
+          child: Text(
+            'Only members can send messages.',
+            style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+          ),
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -331,8 +417,14 @@ class _PoolChatScreenState extends ConsumerState<PoolChatScreen> {
       }
     } catch (e) {
       if (mounted) {
+        String errorMsg = 'Failed to send attachment';
+        if (e.toString().contains('Bucket not found')) {
+          errorMsg = 'Storage bucket "pool_documents" missing. Please create it in Supabase Dashboard.';
+        } else {
+          errorMsg = '$errorMsg: $e';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send attachment: $e')),
+          SnackBar(content: Text(errorMsg)),
         );
       }
     }
@@ -354,7 +446,10 @@ class _ChatBubble extends StatelessWidget {
     required this.timestamp,
     required this.showAvatar,
     this.avatarUrl,
+    this.metadata,
   });
+
+  final Map<String, dynamic>? metadata;
 
   @override
   Widget build(BuildContext context) {
@@ -411,13 +506,7 @@ class _ChatBubble extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        message,
-                        style: TextStyle(
-                          color: isMe ? Colors.white : Colors.black87,
-                          fontSize: 15,
-                        ),
-                      ),
+                      _buildContent(context),
                       const SizedBox(height: 4),
                       Text(
                         DateFormat('h:mm a').format(timestamp),
@@ -435,6 +524,71 @@ class _ChatBubble extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+  Widget _buildContent(BuildContext context) {
+    final isAttachment = metadata?['is_attachment'] == true;
+    if (isAttachment) {
+      final fileUrl = metadata?['file_url'];
+      final fileName = metadata?['file_name'] ?? 'Attachment';
+      final fileType = metadata?['file_type']?.toString().toLowerCase();
+      
+      if (fileUrl != null && (fileType == 'jpg' || fileType == 'jpeg' || fileType == 'png')) {
+         return Column(
+           crossAxisAlignment: CrossAxisAlignment.start,
+           children: [
+             ClipRRect(
+               borderRadius: BorderRadius.circular(8),
+               child: Image.network(
+                 fileUrl,
+                 width: 200,
+                 fit: BoxFit.cover,
+                 errorBuilder: (ctx, err, stack) => const Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                 loadingBuilder: (ctx, child, loadingProgress) {
+                   if (loadingProgress == null) return child;
+                   return Container(
+                     width: 200, height: 150,
+                     color: Colors.grey.shade300,
+                     child: const Center(child: CircularProgressIndicator()),
+                   );
+                 },
+               ),
+             ),
+             if (message.isNotEmpty && !message.startsWith('Sent an attachment:'))
+               Padding(
+                 padding: const EdgeInsets.only(top: 8.0),
+                 child: Text(message, style: TextStyle(color: isMe ? Colors.white : Colors.black87, fontSize: 15)),
+               ),
+           ],
+         );
+      } else {
+        // File attachment
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.insert_drive_file, color: isMe ? Colors.white : Colors.grey.shade700),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                fileName,
+                style: TextStyle(
+                  color: isMe ? Colors.white : Colors.black87,
+                  decoration: TextDecoration.underline,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ],
+        );
+      }
+    }
+    
+    return Text(
+      message,
+      style: TextStyle(
+        color: isMe ? Colors.white : Colors.black87,
+        fontSize: 15,
       ),
     );
   }

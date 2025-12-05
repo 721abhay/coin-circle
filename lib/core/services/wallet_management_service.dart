@@ -160,9 +160,9 @@ class WalletManagementService {
         .from('wallets')
         .select('balance')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-    final totalBalance = (walletResponse['balance'] as num).toDouble();
+    final totalBalance = (walletResponse?['balance'] as num?)?.toDouble() ?? 0.0;
 
     // Get locked balance (sum of contributions in active pools)
     final poolsResponse = await _client

@@ -30,12 +30,24 @@ class PoolService {
     if (user == null) throw const AuthException('User not logged in');
 
     // 🛑 KYC CHECK: Must be KYC verified to create pools
-    final canParticipate = await _client.rpc('can_participate_in_pools', params: {
-      'p_user_id': user.id,
-    });
+    // Check profile directly first
+    final profile = await _client
+        .from('profiles')
+        .select('kyc_verified')
+        .eq('id', user.id)
+        .single();
+        
+    final isKycVerified = profile['kyc_verified'] == true;
     
-    if (canParticipate == false) {
-      throw Exception('KYC verification required. Please complete your KYC verification to create pools.');
+    if (!isKycVerified) {
+      // Double check with RPC just in case
+      final canParticipate = await _client.rpc('can_participate_in_pools', params: {
+        'p_user_id': user.id,
+      });
+      
+      if (canParticipate == false) {
+        throw Exception('KYC verification required. Please complete your KYC verification to create pools.');
+      }
     }
 
     // 🛑 LIMIT CHECK: Max 2 created pools per user
@@ -213,6 +225,26 @@ class PoolService {
     
     if (joinedPoolsCount >= 2) {
       throw Exception('You can only join a maximum of 2 pools.');
+    }
+
+    // 🛑 ID VERIFICATION CHECK: Check if pool requires KYC
+    final poolData = await _client
+        .from('pools')
+        .select('require_id_verification, name')
+        .eq('id', poolId)
+        .single();
+    
+    if (poolData['require_id_verification'] == true) {
+      // Check if user has completed KYC
+      final profile = await _client
+          .from('profiles')
+          .select('kyc_verified')
+          .eq('id', user.id)
+          .single();
+      
+      if (profile['kyc_verified'] != true) {
+        throw Exception('ID verification required to join this pool. Please complete KYC verification first from your profile settings.');
+      }
     }
 
     // Check if already a member (pending or approved)

@@ -16,6 +16,23 @@ class ChatService {
         });
   }
 
+  /// Fetch messages once (for initial load)
+  static Future<List<ChatMessage>> getMessages(String poolId) async {
+    try {
+      final response = await _supabase
+          .from('pool_messages')
+          .select('*, profiles(full_name, avatar_url)')
+          .eq('pool_id', poolId)
+          .order('created_at', ascending: true);
+      
+      return (response as List)
+          .map((message) => ChatMessage.fromMap(message))
+          .toList();
+    } catch (e) {
+      throw Exception('Failed to load messages: $e');
+    }
+  }
+
   /// Send a user message to the pool chat
   static Future<void> sendMessage({
     required String poolId,
@@ -27,13 +44,27 @@ class ChatService {
         throw Exception('User not authenticated');
       }
 
-      await _supabase.from('pool_messages').insert({
-        'pool_id': poolId,
-        'user_id': userId,
-        'message_type': 'user_message',
-        'content': content,
-        'metadata': {},
-      });
+      try {
+        await _supabase.rpc('send_pool_message', params: {
+          'p_pool_id': poolId,
+          'p_content': content,
+          'p_message_type': 'user_message',
+          'p_metadata': {},
+        });
+      } catch (rpcError) {
+        // Fallback to direct insert if RPC not found
+        if (rpcError.toString().contains('function') && rpcError.toString().contains('not found')) {
+           await _supabase.from('pool_messages').insert({
+            'pool_id': poolId,
+            'user_id': userId,
+            'message_type': 'user_message',
+            'content': content,
+            'metadata': {},
+          });
+        } else {
+          rethrow;
+        }
+      }
     } catch (e) {
       throw Exception('Failed to send message: $e');
     }
@@ -50,17 +81,36 @@ class ChatService {
       final userId = _supabase.auth.currentUser?.id;
       if (userId == null) throw Exception('User not authenticated');
 
-      await _supabase.from('pool_messages').insert({
-        'pool_id': poolId,
-        'user_id': userId,
-        'message_type': 'attachment',
-        'content': 'Sent an attachment: $fileName',
-        'metadata': {
-          'file_url': fileUrl,
-          'file_name': fileName,
-          'file_type': fileType,
-        },
-      });
+      try {
+        await _supabase.rpc('send_pool_message', params: {
+          'p_pool_id': poolId,
+          'p_content': 'Sent an attachment: $fileName',
+          'p_message_type': 'user_message', // Or 'attachment' if enum supports it?
+          // Wait, enum has 'user_message', 'system_notification', etc.
+          // It does NOT have 'attachment'.
+          // So we use 'user_message' and metadata.
+          'p_metadata': {
+            'file_url': fileUrl,
+            'file_name': fileName,
+            'file_type': fileType,
+            'is_attachment': true,
+          },
+        });
+      } catch (rpcError) {
+         // Fallback
+         await _supabase.from('pool_messages').insert({
+          'pool_id': poolId,
+          'user_id': userId,
+          'message_type': 'user_message',
+          'content': 'Sent an attachment: $fileName',
+          'metadata': {
+            'file_url': fileUrl,
+            'file_name': fileName,
+            'file_type': fileType,
+            'is_attachment': true,
+          },
+        });
+      }
     } catch (e) {
       throw Exception('Failed to send attachment: $e');
     }

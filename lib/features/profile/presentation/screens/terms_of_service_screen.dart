@@ -24,11 +24,11 @@ class TermsOfServiceScreen extends StatelessWidget {
             const SizedBox(height: 24),
             _buildSection(
               '1. Acceptance of Terms',
-              'By accessing and using Coin Circle, you accept and agree to be bound by the terms and provision of this agreement.',
+              'By accessing and using Win Pool, you accept and agree to be bound by the terms and provision of this agreement.',
             ),
             _buildSection(
               '2. Description of Service',
-              'Coin Circle provides a platform for users to create and manage Rotating Savings and Credit Associations (ROSCAs). We do not hold funds directly but facilitate transactions between members.',
+              'Win Pool provides a platform for users to create and manage Rotating Savings and Credit Associations (ROSCAs). We do not hold funds directly but facilitate transactions between members.',
             ),
             _buildSection(
               '3. User Responsibilities',
@@ -36,7 +36,7 @@ class TermsOfServiceScreen extends StatelessWidget {
             ),
             _buildSection(
               '4. Financial Risks',
-              'Participation in ROSCAs involves financial risk. Coin Circle is not responsible for defaults by other members, although we provide tools to mitigate these risks.',
+              'Participation in ROSCAs involves financial risk. Win Pool is not responsible for defaults by other members, although we provide tools to mitigate these risks.',
             ),
             _buildSection(
               '5. Termination',

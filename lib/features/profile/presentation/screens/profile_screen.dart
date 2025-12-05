@@ -31,43 +31,54 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user != null) {
-        // Fetch profile
+        // Fetch profile first
         final profile = await Supabase.instance.client
             .from('profiles')
             .select()
             .eq('id', user.id)
             .single();
-        
-        // Fetch wallet stats
-        final wallet = await WalletManagementService.getBalanceBreakdown();
-        
-        // Fetch pool stats
-        final pools = await PoolService.getUserPools();
-        final joined = pools.length;
-        final active = pools.where((p) => p['status'] == 'active').length;
-        final completed = pools.where((p) => p['status'] == 'completed').length;
-        
-        // Calculate performance metrics
-        final metrics = await _calculatePerformanceMetrics(user.id);
 
         if (mounted) {
           setState(() {
             _profile = profile;
-            _walletStats = wallet;
-            _poolStats = {
-              'joined': joined,
-              'active': active,
-              'completed': completed,
-            };
-            _performanceMetrics = metrics;
-            _isLoading = false;
           });
         }
+
+        // Fetch other data independently
+        try {
+          final wallet = await WalletManagementService.getBalanceBreakdown();
+          final pools = await PoolService.getUserPools();
+          final activePools = pools.where((p) => p['status'] == 'active').length;
+          final completedPools = pools.where((p) => p['status'] == 'completed').length;
+          final metrics = await _calculatePerformanceMetrics(user.id);
+
+          if (mounted) {
+            setState(() {
+              _walletStats = wallet;
+              _poolStats = {
+                'joined': pools.length,
+                'active': activePools,
+                'completed': completedPools,
+              };
+              _performanceMetrics = metrics;
+              _isLoading = false;
+            });
+          }
+        } catch (e) {
+          debugPrint('Error loading stats: $e');
+          if (mounted) {
+             setState(() => _isLoading = false);
+          }
+        }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('Error loading profile: $e');
+      debugPrint('Stack trace: $stackTrace');
       if (mounted) {
         setState(() => _isLoading = false);
-        // Handle error silently or show snackbar
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading profile: $e')),
+        );
       }
     }
   }
@@ -116,70 +127,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         'onTimeRate': 0,
         'totalContributed': 0.0,
       };
-    }
-  }
-
-  Future<void> _pickAndUploadImage() async {
-    // Show warning first
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Profile Picture'),
-        content: const Text('Please upload a clear photo of your face. This is mandatory for identity verification.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Select Photo')),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 800, maxHeight: 800);
-    if (image == null) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) return;
-
-      final bytes = await image.readAsBytes();
-      final fileExt = image.path.split('.').last;
-      final fileName = '${user.id}_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
-      final filePath = fileName;
-
-      await Supabase.instance.client.storage
-          .from('avatars')
-          .uploadBinary(filePath, bytes, fileOptions: FileOptions(contentType: 'image/$fileExt'));
-
-      // Get Public URL
-      final imageUrl = Supabase.instance.client.storage
-          .from('avatars')
-          .getPublicUrl(filePath);
-
-      // Update Profile
-      await Supabase.instance.client
-          .from('profiles')
-          .update({'avatar_url': imageUrl})
-          .eq('id', user.id);
-
-      await _loadProfileData(); // Refresh UI
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile picture updated!')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error uploading image: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -242,33 +189,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _buildMetricItem(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade600,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildProfileHeader(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
     final email = user?.email ?? 'No Email';
     final name = _profile?['full_name'] ?? 'User';
-    final phone = _profile?['phone'] ?? 'No Phone';
+    final phone = _profile?['phone_number'] ?? 'No Phone';
     final avatarUrl = _profile?['avatar_url'];
     final location = _profile?['location'];
     final bio = _profile?['bio'];
@@ -280,6 +205,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       } catch (_) {}
     }
 
+    debugPrint('Building Profile Header. Avatar URL: $avatarUrl');
+
     return Column(
       children: [
         Stack(
@@ -288,9 +215,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               radius: 50,
               backgroundColor: Colors.grey.shade200,
               backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
-                  ? NetworkImage(avatarUrl.startsWith('http') 
-                      ? avatarUrl 
-                      : 'https://htwchvjmnqjccxshzdrw.supabase.co/storage/v1/object/public/avatars/$avatarUrl')
+                  ? NetworkImage('$avatarUrl?t=${DateTime.now().millisecondsSinceEpoch}')
                   : null,
               child: (avatarUrl == null || avatarUrl.isEmpty)
                   ? Icon(Icons.person, size: 60, color: Colors.grey.shade400)
@@ -325,6 +250,85 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           Text('Born: ${DateFormat.yMMMMd().format(dob)}', style: const TextStyle(color: Colors.grey)),
       ],
     );
+  }
+
+  // Removed _getAvatarUrl as we are using public URL with cache busting
+
+  Future<void> _pickAndUploadImage() async {
+    // Show warning first
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Profile Picture'),
+        content: const Text('Please upload a clear photo of your face. This is mandatory for identity verification.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Select Photo')),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.gallery, maxWidth: 800, maxHeight: 800);
+    if (image == null) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      final bytes = await image.readAsBytes();
+      final fileExt = image.path.split('.').last;
+      // Use fixed filename to prevent accumulation and make URL predictable
+      final fileName = '${user.id}.$fileExt'; 
+      final filePath = fileName;
+
+      // Upload with upsert (overwrite)
+      await Supabase.instance.client.storage
+          .from('avatars')
+          .uploadBinary(
+            filePath, 
+            bytes, 
+            fileOptions: FileOptions(
+              contentType: 'image/$fileExt',
+              upsert: true,
+            ),
+          );
+
+      // Get Public URL
+      final imageUrl = Supabase.instance.client.storage
+          .from('avatars')
+          .getPublicUrl(filePath);
+      
+      debugPrint('Image uploaded. Public URL: $imageUrl');
+
+      // Update Profile
+      await Supabase.instance.client
+          .from('profiles')
+          .update({'avatar_url': imageUrl})
+          .eq('id', user.id);
+
+      // Force UI refresh by reloading profile data
+      await _loadProfileData(); 
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile picture updated!')),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error uploading image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading image: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Widget _buildAccountStats(BuildContext context) {
@@ -380,6 +384,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMetricItem(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade600,
+          ),
+        ),
+      ],
     );
   }
 

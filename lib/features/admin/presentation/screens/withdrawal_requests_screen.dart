@@ -13,7 +13,7 @@ class _WithdrawalRequestsScreenState extends State<WithdrawalRequestsScreen> {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _requests = [];
   bool _isLoading = true;
-  String _filter = 'pending'; // pending, approved, rejected, all
+  String _filter = 'pending'; // pending, completed, rejected, all
 
   @override
   void initState() {
@@ -56,7 +56,7 @@ class _WithdrawalRequestsScreenState extends State<WithdrawalRequestsScreen> {
 
       // 1. Update withdrawal request status
       await _supabase.from('withdrawal_requests').update({
-        'status': 'approved',
+        'status': 'completed',
         'processed_by': adminId,
         'processed_at': DateTime.now().toIso8601String(),
       }).eq('id', requestId);
@@ -198,7 +198,7 @@ class _WithdrawalRequestsScreenState extends State<WithdrawalRequestsScreen> {
               spacing: 8,
               children: [
                 _buildFilterChip('Pending', 'pending'),
-                _buildFilterChip('Approved', 'approved'),
+                _buildFilterChip('Completed', 'completed'),
                 _buildFilterChip('Rejected', 'rejected'),
                 _buildFilterChip('All', 'all'),
               ],
@@ -225,9 +225,9 @@ class _WithdrawalRequestsScreenState extends State<WithdrawalRequestsScreen> {
                             margin: const EdgeInsets.only(bottom: 16),
                             child: ExpansionTile(
                               leading: CircleAvatar(
-                                backgroundColor: status == 'pending' ? Colors.orange : (status == 'approved' ? Colors.green : Colors.red),
+                                backgroundColor: status == 'pending' ? Colors.orange : (status == 'completed' ? Colors.green : Colors.red),
                                 child: Icon(
-                                  status == 'pending' ? Icons.hourglass_empty : (status == 'approved' ? Icons.check : Icons.close),
+                                  status == 'pending' ? Icons.hourglass_empty : (status == 'completed' ? Icons.check : Icons.close),
                                   color: Colors.white,
                                 ),
                               ),

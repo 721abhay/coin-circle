@@ -80,7 +80,7 @@ class _WalletScreenState extends State<WalletScreen> {
     var options = {
       'key': 'rzp_test_1DP5mmOlF5G5ag', // Replace with your Key ID
       'amount': (amount * 100).toInt(), // Amount in paise
-      'name': 'Coin Circle',
+      'name': 'Win Pool',
       'description': 'Add Money to Wallet',
       'retry': {'enabled': true, 'max_count': 1},
       'send_sms_hash': true,
@@ -160,13 +160,7 @@ class _WalletScreenState extends State<WalletScreen> {
             const SizedBox(height: 24),
             _buildBalanceBreakdown(context),
             const SizedBox(height: 24),
-            Text(
-              'Quick Actions',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            _buildQuickActions(context),
-            const SizedBox(height: 24),
+
             Text(
               'Recent Transactions',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -320,59 +314,7 @@ class _WalletScreenState extends State<WalletScreen> {
     );
   }
 
-  Widget _buildQuickActions(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildQuickActionCard(
-            context,
-            'Auto-Pay',
-            Icons.autorenew,
-            Colors.blue,
-            () {},
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildQuickActionCard(
-            context,
-            'Statements',
-            Icons.receipt_long,
-            Colors.purple,
-            () {},
-          ),
-        ),
-      ],
-    );
-  }
 
-  Widget _buildQuickActionCard(BuildContext context, String title, IconData icon, Color color, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(width: 12),
-            Text(
-              title,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildTransactionList() {
     if (_transactions.isEmpty) {

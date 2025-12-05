@@ -8,7 +8,7 @@ class AppConfig {
   static const String adminIfsc = 'HDFC0001234';        // ← UPDATE THIS
   
   // App Info
-  static const String appName = 'Coin Circle';
+  static const String appName = 'Win Pool';
   static const String appVersion = '1.0.0';
   static const String supportEmail = 'support@coincircle.com';
 }

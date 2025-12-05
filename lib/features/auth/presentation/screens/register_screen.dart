@@ -85,7 +85,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           password: _passwordController.text,
           userData: {
             'full_name': _nameController.text.trim(),
-            'phone': _phoneController.text.trim(),
+            'phone_number': _phoneController.text.trim(),
           },
         );
 
@@ -190,7 +190,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Join Coin Circle and start saving together.',
+                  'Join Win Pool and start saving together.',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: Colors.grey.shade600,
                       ),

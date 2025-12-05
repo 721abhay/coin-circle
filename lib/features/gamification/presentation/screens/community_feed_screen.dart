@@ -36,7 +36,7 @@ class CommunityFeedScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Thanks to everyone in the "Vacation Savers" pool. Used the money to book my dream trip to Bali! #SavingsGoals #CoinCircle',
+                        'Thanks to everyone in the "Vacation Savers" pool. Used the money to book my dream trip to Bali! #SavingsGoals #WinPool',
                       ),
                       const SizedBox(height: 12),
                       Container(

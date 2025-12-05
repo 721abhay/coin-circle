@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class ContactSupportScreen extends StatelessWidget {
   const ContactSupportScreen({super.key});
@@ -41,33 +42,14 @@ class ContactSupportScreen extends StatelessWidget {
             Colors.orange,
             () {},
           ),
-          const SizedBox(height: 32),
-          const Text('Submit a Ticket', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          const TextField(
-            decoration: InputDecoration(
-              labelText: 'Subject',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const TextField(
-            decoration: InputDecoration(
-              labelText: 'Description',
-              border: OutlineInputBorder(),
-              alignLabelWithHint: true,
-            ),
-            maxLines: 5,
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ticket Submitted')));
-              },
-              child: const Text('Submit Ticket'),
-            ),
+          _buildContactOption(
+            context,
+            'Submit a Ticket',
+            'Report a problem or request help',
+            'Track status in app',
+            Icons.confirmation_number,
+            Colors.purple,
+            () => context.push('/support/report-problem'),
           ),
         ],
       ),

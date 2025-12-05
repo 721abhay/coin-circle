@@ -45,16 +45,7 @@ class _PoolStatisticsScreenState extends State<PoolStatisticsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pool Statistics'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.download),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Downloading report...')),
-              );
-            },
-          ),
-        ],
+        actions: [],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

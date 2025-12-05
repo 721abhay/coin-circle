@@ -33,7 +33,7 @@ class AuthService {
   Future<bool> signInWithGoogle() async {
     return await _client.auth.signInWithOAuth(
       OAuthProvider.google,
-      redirectTo: 'io.supabase.coincircle://login-callback/',
+      redirectTo: 'io.supabase.winpool://login-callback/',
     );
   }
 
@@ -41,7 +41,7 @@ class AuthService {
   Future<bool> signInWithApple() async {
     return await _client.auth.signInWithOAuth(
       OAuthProvider.apple,
-      redirectTo: 'io.supabase.coincircle://login-callback/',
+      redirectTo: 'io.supabase.winpool://login-callback/',
     );
   }
 

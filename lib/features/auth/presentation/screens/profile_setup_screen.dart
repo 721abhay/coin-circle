@@ -345,239 +345,245 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Widget _buildProfilePictureStep() {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text(
-            'Add Profile Picture',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'Add Profile Picture',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Help others recognize you',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
+            const SizedBox(height: 12),
+            Text(
+              'Help others recognize you',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade600,
+              ),
             ),
-          ),
-          const SizedBox(height: 48),
-          
-          // Profile Picture Preview
-          GestureDetector(
-            onTap: _showImageSourceOptions,
-            child: Container(
-              width: 150,
-              height: 150,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.grey.shade200,
-                image: _profileImage != null
-                    ? DecorationImage(
-                        image: FileImage(_profileImage!),
-                        fit: BoxFit.cover,
+            const SizedBox(height: 48),
+            
+            // Profile Picture Preview
+            GestureDetector(
+              onTap: _showImageSourceOptions,
+              child: Container(
+                width: 150,
+                height: 150,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey.shade200,
+                  image: _profileImage != null
+                      ? DecorationImage(
+                          image: FileImage(_profileImage!),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+                child: _profileImage == null
+                    ? const Icon(
+                        Icons.add_a_photo,
+                        size: 50,
+                        color: Color(0xFF6C63FF),
                       )
                     : null,
               ),
-              child: _profileImage == null
-                  ? const Icon(
-                      Icons.add_a_photo,
-                      size: 50,
-                      color: Color(0xFF6C63FF),
-                    )
-                  : null,
             ),
-          ),
-          
-          const SizedBox(height: 24),
-          
-          Text(
-            _profileImage == null ? 'Tap to add photo' : 'Tap to change photo',
-            style: TextStyle(
-              color: Colors.grey.shade600,
+            
+            const SizedBox(height: 24),
+            
+            Text(
+              _profileImage == null ? 'Tap to add photo' : 'Tap to change photo',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildPhoneNumberStep() {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text(
-            'Add Phone Number',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Stay connected with your savings circle',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 48),
-          
-          Row(
-            children: [
-              // Country Code Dropdown
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: DropdownButton<String>(
-                  value: _selectedCountryCode,
-                  underline: const SizedBox(),
-                  items: const [
-                    DropdownMenuItem(value: '+1', child: Text('+1')),
-                    DropdownMenuItem(value: '+44', child: Text('+44')),
-                    DropdownMenuItem(value: '+91', child: Text('+91')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _selectedCountryCode = value;
-                      });
-                    }
-                  },
-                ),
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'Add Phone Number',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(width: 12),
-              
-              // Phone Number Input
-              Expanded(
-                child: TextField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    hintText: 'Phone Number',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: Color(0xFF6C63FF),
-                        width: 2,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Stay connected with your savings circle',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 48),
+            
+            Row(
+              children: [
+                // Country Code Dropdown
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: DropdownButton<String>(
+                    value: _selectedCountryCode,
+                    underline: const SizedBox(),
+                    items: const [
+                      DropdownMenuItem(value: '+1', child: Text('+1')),
+                      DropdownMenuItem(value: '+44', child: Text('+44')),
+                      DropdownMenuItem(value: '+91', child: Text('+91')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          _selectedCountryCode = value;
+                        });
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                
+                // Phone Number Input
+                Expanded(
+                  child: TextField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      hintText: 'Phone Number',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFF6C63FF),
+                          width: 2,
+                        ),
                       ),
                     ),
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _bioController,
+              decoration: const InputDecoration(
+                labelText: 'Bio (Optional)',
+                hintText: 'Tell us about yourself',
+                border: OutlineInputBorder(),
               ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          TextField(
-            controller: _bioController,
-            decoration: const InputDecoration(
-              labelText: 'Bio (Optional)',
-              hintText: 'Tell us about yourself',
-              border: OutlineInputBorder(),
+              maxLines: 3,
             ),
-            maxLines: 3,
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _locationController,
-            decoration: const InputDecoration(
-              labelText: 'Location (Optional)',
-              hintText: 'City, Country',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.location_on_outlined),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _locationController,
+              decoration: const InputDecoration(
+                labelText: 'Location (Optional)',
+                hintText: 'City, Country',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.location_on_outlined),
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _dobController,
-            decoration: const InputDecoration(
-              labelText: 'Date of Birth',
-              hintText: 'DD/MM/YYYY',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.calendar_today),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _dobController,
+              decoration: const InputDecoration(
+                labelText: 'Date of Birth',
+                hintText: 'DD/MM/YYYY',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.calendar_today),
+              ),
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: DateTime(2000),
+                  firstDate: DateTime(1900),
+                  lastDate: DateTime.now(),
+                );
+                if (date != null) {
+                  setState(() {
+                    _selectedDate = date;
+                    _dobController.text = DateFormat('dd/MM/yyyy').format(date); // Display format
+                  });
+                }
+              },
+              readOnly: true,
             ),
-            onTap: () async {
-              final date = await showDatePicker(
-                context: context,
-                initialDate: DateTime(2000),
-                firstDate: DateTime(1900),
-                lastDate: DateTime.now(),
-              );
-              if (date != null) {
-                setState(() {
-                  _selectedDate = date;
-                  _dobController.text = DateFormat('dd/MM/yyyy').format(date); // Display format
-                });
-              }
-            },
-            readOnly: true,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildNotificationPreferencesStep() {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text(
-            'Notification Preferences',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'Notification Preferences',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Choose what updates you want to receive',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
+            const SizedBox(height: 12),
+            Text(
+              'Choose what updates you want to receive',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade600,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 48),
-          
-          _buildPreferenceToggle(
-            'Payment Reminders',
-            'Get notified before payments are due',
-            _paymentReminders,
-            (value) => setState(() => _paymentReminders = value),
-          ),
-          _buildPreferenceToggle(
-            'Pool Updates',
-            'New members, cycles, and important changes',
-            _poolUpdates,
-            (value) => setState(() => _poolUpdates = value),
-          ),
-          _buildPreferenceToggle(
-            'Winner Announcements',
-            'Be the first to know who won the draw',
-            _winnerAnnouncements,
-            (value) => setState(() => _winnerAnnouncements = value),
-          ),
-          _buildPreferenceToggle(
-            'Member Activities',
-            'Contributions, joins, and other activities',
-            _memberActivities,
-            (value) => setState(() => _memberActivities = value),
-          ),
-        ],
+            const SizedBox(height: 48),
+            
+            _buildPreferenceToggle(
+              'Payment Reminders',
+              'Get notified before payments are due',
+              _paymentReminders,
+              (value) => setState(() => _paymentReminders = value),
+            ),
+            _buildPreferenceToggle(
+              'Pool Updates',
+              'New members, cycles, and important changes',
+              _poolUpdates,
+              (value) => setState(() => _poolUpdates = value),
+            ),
+            _buildPreferenceToggle(
+              'Winner Announcements',
+              'Be the first to know who won the draw',
+              _winnerAnnouncements,
+              (value) => setState(() => _winnerAnnouncements = value),
+            ),
+            _buildPreferenceToggle(
+              'Member Activities',
+              'Contributions, joins, and other activities',
+              _memberActivities,
+              (value) => setState(() => _memberActivities = value),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -30,8 +30,8 @@ class _FaqScreenState extends State<FaqScreen> {
         _faqs = [
           FaqItem(
             category: 'Getting Started',
-            question: 'What is Coin Circle?',
-            answer: 'Coin Circle is a digital platform for group savings schemes (ROSCA - Rotating Savings and Credit Association). Members pool money together, contribute regularly, and take turns receiving the accumulated funds.',
+            question: 'What is Win Pool?',
+            answer: 'Win Pool is a digital platform for group savings schemes (ROSCA - Rotating Savings and Credit Association). Members pool money together, contribute regularly, and take turns receiving the accumulated funds.',
           ),
           FaqItem(
             category: 'Getting Started',

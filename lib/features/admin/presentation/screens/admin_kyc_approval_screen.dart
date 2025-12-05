@@ -61,16 +61,18 @@ class _AdminKYCApprovalScreenState extends State<AdminKYCApprovalScreen> {
         'verified_at': DateTime.now().toIso8601String(),
       }).eq('id', kycId);
 
-      // Update profiles table to mark user as KYC verified
+      // CRITICAL: Update profiles table to mark user as KYC verified
       await _supabase.from('profiles').update({
         'kyc_verified': true,
+        'is_verified': true, // Also set is_verified for backward compatibility
       }).eq('id', userId);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('KYC Approved Successfully!'),
+            content: Text('KYC Approved Successfully! User can now create and join pools.'),
             backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
           ),
         );
         _loadPendingKYCs();
@@ -300,32 +302,51 @@ class _AdminKYCApprovalScreenState extends State<AdminKYCApprovalScreen> {
     );
   }
 
-  Widget _buildImagePreview(String label, String url) {
+  Widget _buildImagePreview(String label, String? url) {
+    if (url == null || url.isEmpty) return const SizedBox.shrink();
+    
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
           ),
           const SizedBox(height: 8),
           Container(
-            height: 200,
+            height: 250, // Increased height for better visibility
             width: double.infinity,
             decoration: BoxDecoration(
               border: Border.all(color: Colors.grey.shade300),
               borderRadius: BorderRadius.circular(8),
+              color: Colors.grey.shade50,
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.network(
                 url,
-                fit: BoxFit.contain,
+                fit: BoxFit.contain, // Ensures the whole image is seen
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded / 
+                            loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  );
+                },
                 errorBuilder: (context, error, stackTrace) {
-                  return const Center(
-                    child: Text('Error loading image'),
+                  return Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                      const SizedBox(height: 8),
+                      Text('Could not load image\n$error', textAlign: TextAlign.center, style: const TextStyle(fontSize: 10)),
+                    ],
                   );
                 },
               ),

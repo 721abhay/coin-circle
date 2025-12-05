@@ -20,7 +20,7 @@ class PoolDetailsScreen extends ConsumerStatefulWidget {
   ConsumerState<PoolDetailsScreen> createState() => _PoolDetailsScreenState();
 }
 
-class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with SingleTickerProviderStateMixin {
+class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with TickerProviderStateMixin {
   late TabController _tabController;
   Map<String, dynamic>? _pool;
   bool _isLoading = true;
@@ -28,7 +28,8 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Sing
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 7, vsync: this);
+    // Start with 6 tabs (without chat), will update when pool loads
+    _tabController = TabController(length: 6, vsync: this);
     _loadPoolDetails();
   }
 
@@ -36,6 +37,20 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Sing
     try {
       final pool = await PoolService.getPoolDetails(widget.poolId);
       if (mounted) {
+        // Recreate tab controller with correct length based on chat setting
+        final enableChat = pool['enable_chat'] == true;
+        final newLength = enableChat ? 7 : 6;
+        
+        if (_tabController.length != newLength) {
+          final oldIndex = _tabController.index;
+          _tabController.dispose();
+          _tabController = TabController(length: newLength, vsync: this);
+          // Try to maintain the same tab if possible
+          if (oldIndex < newLength) {
+            _tabController.index = oldIndex;
+          }
+        }
+        
         setState(() {
           _pool = pool;
           _isLoading = false;
@@ -148,14 +163,14 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Sing
                 controller: _tabController,
                 indicatorColor: Colors.white,
                 isScrollable: true,
-                tabs: const [
-                  Tab(text: 'Overview'),
-                  Tab(text: 'Members'),
-                  Tab(text: 'Schedule'),
-                  Tab(text: 'Winners'),
-                  Tab(text: 'Chat'),
-                  Tab(text: 'Docs'),
-                  Tab(text: 'Stats'),
+                tabs: [
+                  const Tab(text: 'Overview'),
+                  const Tab(text: 'Members'),
+                  const Tab(text: 'Schedule'),
+                  const Tab(text: 'Winners'),
+                  if (_pool?['enable_chat'] == true) const Tab(text: 'Chat'),
+                  const Tab(text: 'Docs'),
+                  const Tab(text: 'Stats'),
                 ],
               ),
             ),
@@ -171,7 +186,7 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Sing
             _MembersTab(poolId: widget.poolId),
             _ScheduleTab(poolId: widget.poolId),
             _WinnersTab(poolId: widget.poolId),
-            _ChatTab(poolId: widget.poolId),
+            if (_pool?['enable_chat'] == true) _ChatTab(poolId: widget.poolId),
             _DocsTab(poolId: widget.poolId, isCreator: isCreator),
             _StatsTab(poolId: widget.poolId),
           ],

@@ -31,7 +31,7 @@ class HelpSupportScreen extends StatelessWidget {
             context,
             icon: Icons.email,
             title: 'Email Us',
-            subtitle: 'support@coincircle.com',
+            subtitle: 'support@winpool.com',
             onTap: () => context.push('/submit-ticket'),
           ),
           _buildSupportItem(

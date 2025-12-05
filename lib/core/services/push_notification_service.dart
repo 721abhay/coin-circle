@@ -50,7 +50,7 @@ class PushNotificationService {
       // Create Android notification channel
       const androidChannel = AndroidNotificationChannel(
         'coin_circle_notifications',
-        'Coin Circle Notifications',
+        'Win Pool Notifications',
         description: 'Notifications for pool updates, payments, and more',
         importance: Importance.high,
         playSound: true,
@@ -114,7 +114,7 @@ class PushNotificationService {
     // Show local notification
     const androidDetails = AndroidNotificationDetails(
       'coin_circle_notifications',
-      'Coin Circle Notifications',
+      'Win Pool Notifications',
       channelDescription: 'Notifications for pool updates, payments, and more',
       importance: Importance.high,
       priority: Priority.high,
@@ -134,7 +134,7 @@ class PushNotificationService {
 
     await _localNotifications.show(
       message.hashCode,
-      message.notification?.title ?? 'Coin Circle',
+      message.notification?.title ?? 'Win Pool',
       message.notification?.body ?? '',
       notificationDetails,
       payload: message.data.toString(),

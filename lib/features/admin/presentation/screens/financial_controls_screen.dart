@@ -83,7 +83,7 @@ class _FinancialControlsScreenState extends State<FinancialControlsScreen> {
 
       // 1. Update winner_history
       await client.from('winner_history').update({
-        'payout_status': 'approved',
+        'payout_status': 'completed',
         'payout_approved_at': DateTime.now().toIso8601String(),
         'payout_approved_by': adminId,
       }).eq('id', winnerHistoryId);

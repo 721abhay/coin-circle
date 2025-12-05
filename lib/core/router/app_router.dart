@@ -59,7 +59,7 @@ import 'package:coin_circle/features/support/presentation/screens/help_support_s
 import 'package:coin_circle/features/profile/presentation/screens/export_data_screen.dart';
 import 'package:coin_circle/features/wallet/presentation/screens/bank_accounts_screen.dart' as wallet;
 import 'package:coin_circle/features/profile/presentation/screens/privacy_settings_screen.dart';
-import 'package:coin_circle/features/support/presentation/screens/submit_ticket_screen.dart';
+
 // NEW FEATURES
 import 'package:coin_circle/features/savings/presentation/screens/smart_savings_screen.dart';
 import 'package:coin_circle/features/expenses/presentation/screens/expense_tracker_screen.dart';
@@ -74,7 +74,7 @@ import 'package:coin_circle/features/admin/presentation/screens/pool_settings_sc
 import 'package:coin_circle/features/admin/presentation/screens/financial_controls_screen.dart';
 import 'package:coin_circle/features/admin/presentation/screens/moderation_dashboard_screen.dart';
 import 'package:coin_circle/features/admin/presentation/screens/admin_dashboard_screen.dart';
-import 'package:coin_circle/features/admin/presentation/screens/kyc_verification_screen.dart' as admin_kyc;
+import 'package:coin_circle/features/admin/presentation/screens/admin_kyc_approval_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/personal_analytics_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/help_center_screen.dart';
 import 'package:coin_circle/features/profile/presentation/screens/contact_support_screen.dart';
@@ -366,7 +366,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/settings/kyc',
-      builder: (context, state) => const KycVerificationScreen(),
+      builder: (context, state) => const KYCVerificationScreen(),
     ),
     GoRoute(
       path: '/settings/privacy',
@@ -464,7 +464,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/submit-ticket',
-      builder: (context, state) => const SubmitTicketScreen(),
+      builder: (context, state) => const ReportProblemScreen(),
     ),
     // NEW FEATURES
     GoRoute(
@@ -481,15 +481,15 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/kyc-verification',
-      builder: (context, state) => const new_kyc.KYCVerificationScreen(),
+      builder: (context, state) => const KYCVerificationScreen(),
     ),
     GoRoute(
       path: '/kyc-submission',
-      builder: (context, state) => const KYCSubmissionScreen(), // Redirects to /kyc-verification
+      builder: (context, state) => const KYCVerificationScreen(), // Redirects to /kyc-verification
     ),
     GoRoute(
       path: '/admin/kyc-verification',
-      builder: (context, state) => const admin_kyc.KYCVerificationScreen(),
+      builder: (context, state) => const AdminKYCApprovalScreen(),
     ),
     GoRoute(
       path: '/admin/withdrawal-requests',

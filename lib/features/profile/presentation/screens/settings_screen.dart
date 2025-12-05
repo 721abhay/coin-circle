@@ -250,12 +250,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             title: 'Account Management',
             onTap: () => context.push('/settings/account-management'),
           ),
-          _buildListTile(
-            icon: Icons.bug_report_outlined,
-            title: 'Database Test',
-            subtitle: 'Test database connection',
-            onTap: () => context.push('/database-test'),
-          ),
 
           const SizedBox(height: 24),
           Padding(
