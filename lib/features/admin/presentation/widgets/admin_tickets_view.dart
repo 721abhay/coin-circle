@@ -214,12 +214,12 @@ class _AdminTicketsViewState extends ConsumerState<AdminTicketsView> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               OutlinedButton(
-                onPressed: () {},
+                onPressed: () => _dismissTicket(ticket['id']),
                 child: const Text('Dismiss'),
               ),
               const SizedBox(width: 12),
               ElevatedButton.icon(
-                onPressed: () {},
+                onPressed: () => _markSolved(ticket['id']),
                 icon: const Icon(Icons.check),
                 label: const Text('Mark Solved'),
                 style: ElevatedButton.styleFrom(
@@ -232,5 +232,97 @@ class _AdminTicketsViewState extends ConsumerState<AdminTicketsView> {
         ],
       ),
     );
+  }
+
+  Future<void> _dismissTicket(String ticketId) async {
+    try {
+      // Get ticket details first to get user_id
+      final ticket = await Supabase.instance.client
+          .from('support_tickets')
+          .select('user_id, subject')
+          .eq('id', ticketId)
+          .single();
+      
+      // Update ticket status
+      await Supabase.instance.client
+          .from('support_tickets')
+          .update({'status': 'closed'})
+          .eq('id', ticketId);
+      
+      // Send notification to user
+      await Supabase.instance.client
+          .from('notifications')
+          .insert({
+            'user_id': ticket['user_id'],
+            'title': 'Support Ticket Closed',
+            'message': 'Your support ticket "${ticket['subject']}" has been closed by admin.',
+            'type': 'system',
+            'created_at': DateTime.now().toIso8601String(),
+          });
+      
+      await _loadTickets(); // Reload tickets
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ticket dismissed and user notified')),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error dismissing ticket: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _markSolved(String ticketId) async {
+    try {
+      // Get ticket details first to get user_id
+      final ticket = await Supabase.instance.client
+          .from('support_tickets')
+          .select('user_id, subject')
+          .eq('id', ticketId)
+          .single();
+      
+      // Update ticket status
+      await Supabase.instance.client
+          .from('support_tickets')
+          .update({
+            'status': 'resolved',
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', ticketId);
+      
+      // Send notification to user
+      await Supabase.instance.client
+          .from('notifications')
+          .insert({
+            'user_id': ticket['user_id'],
+            'title': 'Support Ticket Resolved',
+            'message': 'Your support ticket "${ticket['subject']}" has been resolved. Thank you for your patience!',
+            'type': 'system',
+            'created_at': DateTime.now().toIso8601String(),
+          });
+      
+      await _loadTickets(); // Reload tickets
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ticket marked as solved and user notified'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error marking ticket as solved: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 }

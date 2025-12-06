@@ -183,18 +183,21 @@ class _AdminUsersViewState extends ConsumerState<AdminUsersView> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.visibility_outlined),
-                      onPressed: () {},
+                      onPressed: () => _viewUserDetails(user),
                       tooltip: 'View Details',
                     ),
                     IconButton(
                       icon: const Icon(Icons.edit_outlined),
-                      onPressed: () {},
+                      onPressed: () => _editUser(user),
                       tooltip: 'Edit User',
                     ),
                     IconButton(
-                      icon: const Icon(Icons.block_outlined, color: Colors.red),
-                      onPressed: () {},
-                      tooltip: 'Ban User',
+                      icon: Icon(
+                        user['is_suspended'] == true ? Icons.check_circle_outline : Icons.block_outlined,
+                        color: user['is_suspended'] == true ? Colors.green : Colors.red,
+                      ),
+                      onPressed: () => _toggleSuspendUser(user),
+                      tooltip: user['is_suspended'] == true ? 'Unsuspend User' : 'Suspend User',
                     ),
                   ],
                 ),
@@ -203,6 +206,217 @@ class _AdminUsersViewState extends ConsumerState<AdminUsersView> {
           );
           }).toList(),
         ),
+      ),
+    );
+  }
+
+  void _viewUserDetails(Map<String, dynamic> user) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(user['full_name'] ?? 'User Details'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildDetailRow('Email', user['email'] ?? 'N/A'),
+              _buildDetailRow('Phone', user['phone_number'] ?? 'N/A'),
+              _buildDetailRow('User ID', user['id'] ?? 'N/A'),
+              _buildDetailRow('Status', user['is_suspended'] == true ? 'Suspended' : 'Active'),
+              _buildDetailRow('KYC', user['kyc_verified'] == true ? 'Verified' : 'Pending'),
+              _buildDetailRow('Admin', user['is_admin'] == true ? 'Yes' : 'No'),
+              _buildDetailRow('Joined', user['created_at'] != null 
+                  ? DateTime.parse(user['created_at']).toString().substring(0, 16)
+                  : 'Unknown'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(
+            child: Text(value),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editUser(Map<String, dynamic> user) {
+    final nameController = TextEditingController(text: user['full_name']);
+    final phoneController = TextEditingController(text: user['phone_number']);
+    bool isAdmin = user['is_admin'] == true;
+    bool kycVerified = user['kyc_verified'] == true;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Edit User'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Full Name'),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: phoneController,
+                  decoration: const InputDecoration(labelText: 'Phone Number'),
+                ),
+                const SizedBox(height: 16),
+                SwitchListTile(
+                  title: const Text('Admin'),
+                  value: isAdmin,
+                  onChanged: (val) => setState(() => isAdmin = val),
+                ),
+                SwitchListTile(
+                  title: const Text('KYC Verified'),
+                  value: kycVerified,
+                  onChanged: (val) => setState(() => kycVerified = val),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                try {
+                  await Supabase.instance.client
+                      .from('profiles')
+                      .update({
+                        'full_name': nameController.text,
+                        'phone_number': phoneController.text,
+                        'is_admin': isAdmin,
+                        'kyc_verified': kycVerified,
+                      })
+                      .eq('id', user['id']);
+                  
+                  if (mounted) {
+                    Navigator.pop(context);
+                    _loadUsers(); // Reload users
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('User updated successfully')),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                    );
+                  }
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _toggleSuspendUser(Map<String, dynamic> user) {
+    final isSuspended = user['is_suspended'] == true;
+    final action = isSuspended ? 'Unsuspend' : 'Suspend';
+    final reasonController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('$action User?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Are you sure you want to $action ${user['full_name']}?'),
+            if (!isSuspended) ...[
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  labelText: 'Reason (required)',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 2,
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              // Validate reason for suspension
+              if (!isSuspended && reasonController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please provide a reason'), backgroundColor: Colors.red),
+                );
+                return;
+              }
+
+              try {
+                final reason = isSuspended ? 'Account unsuspended by admin' : reasonController.text.trim();
+                
+                // Use RPC function
+                await Supabase.instance.client.rpc('suspend_user_admin', params: {
+                  'p_reason': reason,
+                  'p_user_id': user['id'],
+                });
+                
+                if (mounted) {
+                  Navigator.pop(context);
+                  _loadUsers(); // Reload users
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('User ${isSuspended ? 'unsuspended' : 'suspended'} and notified'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                debugPrint('Error suspending user: $e');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isSuspended ? Colors.green : Colors.red,
+            ),
+            child: Text(action),
+          ),
+        ],
       ),
     );
   }

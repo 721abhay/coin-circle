@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key});
@@ -18,7 +19,7 @@ class HelpSupportScreen extends StatelessWidget {
             icon: Icons.question_answer,
             title: 'FAQs',
             subtitle: 'Frequently asked questions',
-            onTap: () {},
+            onTap: () => context.push('/faq'),
           ),
           _buildSupportItem(
             context,
@@ -31,19 +32,80 @@ class HelpSupportScreen extends StatelessWidget {
             context,
             icon: Icons.email,
             title: 'Email Us',
-            subtitle: 'support@winpool.com',
-            onTap: () => context.push('/submit-ticket'),
+            subtitle: 'winpoolqsypport@gmail.com',
+            onTap: () => _launchEmail(context),
           ),
           _buildSupportItem(
             context,
             icon: Icons.phone,
             title: 'Call Us',
             subtitle: '+91 1234567890',
-            onTap: () {},
+            onTap: () => _launchPhone(context),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _launchEmail(BuildContext context) async {
+    final Uri emailUri = Uri(
+      scheme: 'mailto',
+      path: 'winpoolqsypport@gmail.com',
+      query: 'subject=Support Request from Win Pool App',
+    );
+
+    try {
+      if (await canLaunchUrl(emailUri)) {
+        await launchUrl(emailUri);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not open email app. Please email us at winpoolqsypport@gmail.com'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error opening email app'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _launchPhone(BuildContext context) async {
+    final Uri phoneUri = Uri(
+      scheme: 'tel',
+      path: '+911234567890',
+    );
+
+    try {
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not open phone app. Please call +91 1234567890'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error opening phone app'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildSupportItem(

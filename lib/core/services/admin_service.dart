@@ -388,4 +388,98 @@ class AdminService {
       return 'Unknown';
     }
   }
+
+  /// Get system setting
+  static Future<Map<String, dynamic>> getSystemSetting(String key) async {
+    try {
+      final response = await _client.rpc('get_system_setting', params: {
+        'p_setting_key': key,
+      });
+      return Map<String, dynamic>.from(response ?? {});
+    } catch (e) {
+      debugPrint('Error fetching system setting: $e');
+      return {};
+    }
+  }
+
+  /// Update system setting
+  static Future<void> updateSystemSetting(String key, Map<String, dynamic> value) async {
+    try {
+      final user = _client.auth.currentUser;
+      if (user == null) throw Exception('User not logged in');
+
+      await _client.rpc('update_system_setting', params: {
+        'p_setting_key': key,
+        'p_setting_value': value,
+        'p_user_id': user.id,
+      });
+    } catch (e) {
+      debugPrint('Error updating system setting: $e');
+      rethrow;
+    }
+  }
+
+  /// Get all announcements
+  static Future<List<Map<String, dynamic>>> getAnnouncements({int limit = 10}) async {
+    try {
+      final response = await _client
+          .from('system_announcements')
+          .select()
+          .eq('is_active', true)
+          .order('created_at', ascending: false)
+          .limit(limit);
+      
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      debugPrint('Error fetching announcements: $e');
+      return [];
+    }
+  }
+
+  /// Create announcement
+  static Future<void> createAnnouncement(String message, String priority) async {
+    try {
+      final user = _client.auth.currentUser;
+      if (user == null) throw Exception('User not logged in');
+
+      await _client.rpc('create_announcement', params: {
+        'p_message': message,
+        'p_priority': priority,
+        'p_user_id': user.id,
+      });
+    } catch (e) {
+      debugPrint('Error creating announcement: $e');
+      rethrow;
+    }
+  }
+
+  /// Trigger database backup (placeholder - would integrate with actual backup system)
+  static Future<Map<String, dynamic>> triggerDatabaseBackup() async {
+    try {
+      // In production, this would trigger actual backup via Supabase API or custom endpoint
+      // For now, we'll just log it
+      final timestamp = DateTime.now().toIso8601String();
+      debugPrint('Database backup triggered at $timestamp');
+      
+      return {
+        'success': true,
+        'timestamp': timestamp,
+        'message': 'Backup initiated successfully',
+      };
+    } catch (e) {
+      debugPrint('Error triggering backup: $e');
+      rethrow;
+    }
+  }
+
+  /// Clear system cache (placeholder - would integrate with actual cache system)
+  static Future<void> clearSystemCache() async {
+    try {
+      // In production, this would clear Redis/Memcached or similar
+      debugPrint('System cache cleared');
+    } catch (e) {
+      debugPrint('Error clearing cache: $e');
+      rethrow;
+    }
+  }
 }

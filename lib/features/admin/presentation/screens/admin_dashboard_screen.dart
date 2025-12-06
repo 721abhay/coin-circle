@@ -44,8 +44,13 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E2C),
-        title: const Text('Admin Command Center'),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1E1E2C),
+        elevation: 2,
+        title: const Text(
+          'Admin Command Center',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         actions: [
           IconButton(
             tooltip: 'Emergency Stop',
@@ -115,12 +120,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
           const SizedBox(height: 24),
           _buildQuickActions(),
           const SizedBox(height: 24),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Column(
             children: [
-              Expanded(flex: 2, child: _buildRevenueChart()),
-              const SizedBox(width: 24),
-              Expanded(flex: 1, child: _buildRecentActions()),
+              _buildRevenueChart(),
+              const SizedBox(height: 24),
+              _buildRecentActions(),
             ],
           ),
         ],

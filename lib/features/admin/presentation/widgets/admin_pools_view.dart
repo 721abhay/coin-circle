@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/services/admin_service.dart';
 import '../../../../core/services/pool_service.dart';
 
 class AdminPoolsView extends ConsumerStatefulWidget {
@@ -13,6 +14,7 @@ class AdminPoolsView extends ConsumerStatefulWidget {
 class _AdminPoolsViewState extends ConsumerState<AdminPoolsView> {
   List<Map<String, dynamic>> _pools = [];
   bool _isLoading = true;
+  String _selectedStatus = 'all';
 
   @override
   void initState() {
@@ -21,9 +23,12 @@ class _AdminPoolsViewState extends ConsumerState<AdminPoolsView> {
   }
 
   Future<void> _loadPools() async {
+    setState(() => _isLoading = true);
     try {
-      // Fetch pools created by the admin (official pools)
-      final pools = await PoolService.getUserPools(); 
+      // Fetch ALL pools from database (admin view)
+      final pools = await AdminService.getAllPools(
+        status: _selectedStatus == 'all' ? null : _selectedStatus,
+      );
       
       if (mounted) {
         setState(() {
@@ -32,7 +37,13 @@ class _AdminPoolsViewState extends ConsumerState<AdminPoolsView> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      debugPrint('Error loading pools: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading pools: $e')),
+        );
+      }
     }
   }
 
@@ -57,9 +68,8 @@ class _AdminPoolsViewState extends ConsumerState<AdminPoolsView> {
       try {
         await PoolService.deletePool(poolId);
         
-        setState(() {
-          _pools.removeWhere((p) => p['id'] == poolId);
-        });
+        // Reload pools from database instead of just removing from local list
+        await _loadPools();
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -182,22 +192,72 @@ class _AdminPoolsViewState extends ConsumerState<AdminPoolsView> {
   }
 
   Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
       children: [
-        const Text(
-          'Pool Management',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Pool Management',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                final result = await context.push('/create-pool');
+                if (result == true) {
+                  _loadPools(); // Refresh after creating new pool
+                }
+              },
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Create'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1E1E2C),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+            ),
+          ],
         ),
-        ElevatedButton.icon(
-          onPressed: () => context.push('/create-pool'),
-          icon: const Icon(Icons.add, size: 18),
-          label: const Text('Create'), // Shortened text to prevent overflow
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1E1E2C),
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            const Text('Filter: ', style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: DropdownButton<String>(
+                  value: _selectedStatus,
+                  isExpanded: true,
+                  underline: const SizedBox(),
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('All Pools')),
+                    DropdownMenuItem(value: 'pending', child: Text('Pending')),
+                    DropdownMenuItem(value: 'active', child: Text('Active')),
+                    DropdownMenuItem(value: 'completed', child: Text('Completed')),
+                    DropdownMenuItem(value: 'paused', child: Text('Paused')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _selectedStatus = value);
+                      _loadPools();
+                    }
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _loadPools,
+              tooltip: 'Refresh',
+            ),
+          ],
         ),
       ],
     );

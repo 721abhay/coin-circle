@@ -17,7 +17,7 @@ class _JoinPoolScreenState extends State<JoinPoolScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -37,7 +37,6 @@ class _JoinPoolScreenState extends State<JoinPoolScreen> with SingleTickerProvid
           tabs: const [
             Tab(text: 'Discover'),
             Tab(text: 'Browse'),
-            Tab(text: 'Map View'),
             Tab(text: 'Have Code?'),
           ],
         ),
@@ -47,7 +46,6 @@ class _JoinPoolScreenState extends State<JoinPoolScreen> with SingleTickerProvid
         children: [
           _DiscoverTab(),
           _BrowsePoolsTab(),
-          _MapViewTab(),
           _JoinByCodeTab(),
         ],
       ),
@@ -111,7 +109,7 @@ class _DiscoverTab extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             Text(
-              'For now, use "Browse" to see all pools or\n"Have Code?" to join with an invite code',
+              'For now, use "Browse" to see all pools or "Have Code?" to join with an invite code',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.grey.shade500,
@@ -120,30 +118,6 @@ class _DiscoverTab extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _MapViewTab extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.map_outlined, size: 64, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          const Text('Map View', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          const Text('Find pools near you (Coming Soon)', style: TextStyle(color: Colors.grey)),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.my_location),
-            label: const Text('Use Current Location'),
-          ),
-        ],
       ),
     );
   }
@@ -395,23 +369,6 @@ class _JoinByCodeTabState extends State<_JoinByCodeTab> {
               child: _isLoading 
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Text('Find Pool'),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Row(
-            children: [
-              Expanded(child: Divider()),
-              Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('OR')),
-              Expanded(child: Divider()),
-            ],
-          ),
-          const SizedBox(height: 24),
-          OutlinedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.camera_alt),
-            label: const Text('Scan QR Code'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
             ),
           ),
         ],

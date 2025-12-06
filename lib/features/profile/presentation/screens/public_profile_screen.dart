@@ -118,11 +118,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
           children: [
             CircleAvatar(
               radius: 50,
-              backgroundImage: _profile?['avatar_url'] != null
-                  ? NetworkImage(_profile!['avatar_url'])
+              backgroundColor: Colors.grey.shade200,
+              backgroundImage: _profile?['avatar_url'] != null && _profile!['avatar_url'].toString().isNotEmpty
+                  ? NetworkImage('${_profile!['avatar_url']}?t=${DateTime.now().millisecondsSinceEpoch}')
                   : null,
-              child: _profile?['avatar_url'] == null
-                  ? const Icon(Icons.person, size: 50)
+              child: (_profile?['avatar_url'] == null || _profile!['avatar_url'].toString().isEmpty)
+                  ? Icon(Icons.person, size: 50, color: Colors.grey.shade400)
                   : null,
             ),
             const SizedBox(height: 16),

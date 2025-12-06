@@ -560,11 +560,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             children: [
               _buildMenuItem(context, 'Help & Support', Icons.help_outline, () => context.push('/help-support')),
               const Divider(height: 1, indent: 56),
-              _buildMenuItem(context, 'Terms of Service', Icons.description, () => context.push('/terms')), // Ensure route exists
+              _buildMenuItem(context, 'Terms of Service', Icons.description, () => context.push('/terms')),
               const Divider(height: 1, indent: 56),
-              _buildMenuItem(context, 'Privacy Policy', Icons.policy, () => context.push('/privacy-policy')), // Ensure route exists
-              const Divider(height: 1, indent: 56),
-              _buildMenuItem(context, 'Export Data', Icons.download, () => context.push('/export-data')),
+              _buildMenuItem(context, 'Privacy Policy', Icons.policy, () => context.push('/privacy-policy')),
               const Divider(height: 1, indent: 56),
               _buildMenuItem(context, 'Log Out', Icons.logout, () => _showLogoutDialog(context), isDestructive: true),
             ],

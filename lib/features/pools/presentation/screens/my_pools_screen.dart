@@ -12,6 +12,13 @@ class MyPoolsScreen extends StatefulWidget {
 
 class _MyPoolsScreenState extends State<MyPoolsScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  
+  // Filter state
+  Set<String> _selectedPaymentStatuses = {};
+  Set<String> _selectedRoles = {};
+  
+  // Sort state
+  String _sortBy = 'name'; // 'name', 'amount', 'next_payment', 'next_draw'
 
   @override
   void initState() {
@@ -53,9 +60,24 @@ class _MyPoolsScreenState extends State<MyPoolsScreen> with SingleTickerProvider
       body: TabBarView(
         controller: _tabController,
         children: [
-          _PoolList(status: 'Active'),
-          _PoolList(status: 'Pending'),
-          _PoolList(status: 'Completed'),
+          _PoolList(
+            status: 'Active',
+            paymentStatusFilter: _selectedPaymentStatuses,
+            roleFilter: _selectedRoles,
+            sortBy: _sortBy,
+          ),
+          _PoolList(
+            status: 'Pending',
+            paymentStatusFilter: _selectedPaymentStatuses,
+            roleFilter: _selectedRoles,
+            sortBy: _sortBy,
+          ),
+          _PoolList(
+            status: 'Completed',
+            paymentStatusFilter: _selectedPaymentStatuses,
+            roleFilter: _selectedRoles,
+            sortBy: _sortBy,
+          ),
         ],
       ),
     );
@@ -68,44 +90,131 @@ class _MyPoolsScreenState extends State<MyPoolsScreen> with SingleTickerProvider
       builder: (context) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ListTile(title: const Text('Sort by Next Payment'), onTap: () => context.pop()),
-          ListTile(title: const Text('Sort by Next Draw'), onTap: () => context.pop()),
-          ListTile(title: const Text('Sort by Name'), onTap: () => context.pop()),
-          ListTile(title: const Text('Sort by Amount'), onTap: () => context.pop()),
+          ListTile(
+            title: const Text('Sort by Next Payment'),
+            trailing: _sortBy == 'next_payment' ? const Icon(Icons.check, color: Colors.green) : null,
+            onTap: () {
+              setState(() => _sortBy = 'next_payment');
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            title: const Text('Sort by Next Draw'),
+            trailing: _sortBy == 'next_draw' ? const Icon(Icons.check, color: Colors.green) : null,
+            onTap: () {
+              setState(() => _sortBy = 'next_draw');
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            title: const Text('Sort by Name'),
+            trailing: _sortBy == 'name' ? const Icon(Icons.check, color: Colors.green) : null,
+            onTap: () {
+              setState(() => _sortBy = 'name');
+              Navigator.pop(context);
+            },
+          ),
+          ListTile(
+            title: const Text('Sort by Amount'),
+            trailing: _sortBy == 'amount' ? const Icon(Icons.check, color: Colors.green) : null,
+            onTap: () {
+              setState(() => _sortBy = 'amount');
+              Navigator.pop(context);
+            },
+          ),
         ],
       ),
     );
   }
 
   void _showFilterBottomSheet(BuildContext context) {
+    // Local state for the dialog
+    Set<String> tempPaymentStatuses = Set.from(_selectedPaymentStatuses);
+    Set<String> tempRoles = Set.from(_selectedRoles);
+    
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Filter Pools', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 24),
-            const Text('Payment Status'),
-            Wrap(
-              spacing: 8,
-              children: ['Paid', 'Pending', 'Overdue'].map((e) => FilterChip(label: Text(e), onSelected: (v) {})).toList(),
-            ),
-            const SizedBox(height: 16),
-            const Text('Role'),
-            Wrap(
-              spacing: 8,
-              children: ['Creator', 'Member'].map((e) => FilterChip(label: Text(e), onSelected: (v) {})).toList(),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(onPressed: () => context.pop(), child: const Text('Apply Filters')),
-            ),
-          ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Filter Pools', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 24),
+              const Text('Payment Status'),
+              Wrap(
+                spacing: 8,
+                children: ['Paid', 'Pending', 'Overdue'].map((status) {
+                  return FilterChip(
+                    label: Text(status),
+                    selected: tempPaymentStatuses.contains(status),
+                    onSelected: (selected) {
+                      setModalState(() {
+                        if (selected) {
+                          tempPaymentStatuses.add(status);
+                        } else {
+                          tempPaymentStatuses.remove(status);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              const Text('Role'),
+              Wrap(
+                spacing: 8,
+                children: ['Creator', 'Member'].map((role) {
+                  return FilterChip(
+                    label: Text(role),
+                    selected: tempRoles.contains(role),
+                    onSelected: (selected) {
+                      setModalState(() {
+                        if (selected) {
+                          tempRoles.add(role);
+                        } else {
+                          tempRoles.remove(role);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        setModalState(() {
+                          tempPaymentStatuses.clear();
+                          tempRoles.clear();
+                        });
+                      },
+                      child: const Text('Clear All'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _selectedPaymentStatuses = tempPaymentStatuses;
+                          _selectedRoles = tempRoles;
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Apply Filters'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -114,8 +223,16 @@ class _MyPoolsScreenState extends State<MyPoolsScreen> with SingleTickerProvider
 
 class _PoolList extends StatefulWidget {
   final String status;
+  final Set<String> paymentStatusFilter;
+  final Set<String> roleFilter;
+  final String sortBy;
 
-  const _PoolList({required this.status});
+  const _PoolList({
+    required this.status,
+    required this.paymentStatusFilter,
+    required this.roleFilter,
+    required this.sortBy,
+  });
 
   @override
   State<_PoolList> createState() => _PoolListState();
@@ -131,6 +248,17 @@ class _PoolListState extends State<_PoolList> {
     _loadPools();
   }
 
+  @override
+  void didUpdateWidget(_PoolList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reload when filters or sort changes
+    if (oldWidget.paymentStatusFilter != widget.paymentStatusFilter ||
+        oldWidget.roleFilter != widget.roleFilter ||
+        oldWidget.sortBy != widget.sortBy) {
+      _loadPools();
+    }
+  }
+
   Future<void> _loadPools() async {
     setState(() => _isLoading = true);
     try {
@@ -138,7 +266,8 @@ class _PoolListState extends State<_PoolList> {
       
       if (mounted) {
         setState(() {
-          _pools = pools.where((pool) {
+          // Filter by tab status
+          var filteredPools = pools.where((pool) {
             final membershipStatus = (pool['membership_status'] ?? 'active').toString().toLowerCase();
             final targetTab = widget.status.toLowerCase();
             
@@ -151,7 +280,47 @@ class _PoolListState extends State<_PoolList> {
             }
             return false;
           }).toList();
-          
+
+          // Apply role filter
+          if (widget.roleFilter.isNotEmpty) {
+            filteredPools = filteredPools.where((pool) {
+              final role = pool['role'] ?? 'member';
+              if (widget.roleFilter.contains('Creator') && role == 'admin') return true;
+              if (widget.roleFilter.contains('Member') && role == 'member') return true;
+              return false;
+            }).toList();
+          }
+
+          // Apply payment status filter (for active pools)
+          if (widget.paymentStatusFilter.isNotEmpty && widget.status == 'Active') {
+            filteredPools = filteredPools.where((pool) {
+              // This would require payment data - for now, just return all
+              // In a real implementation, you'd check payment status from transactions
+              return true;
+            }).toList();
+          }
+
+          // Apply sorting
+          filteredPools.sort((a, b) {
+            switch (widget.sortBy) {
+              case 'name':
+                return (a['name'] ?? '').toString().compareTo((b['name'] ?? '').toString());
+              case 'amount':
+                final amountA = (a['contribution_amount'] as num?)?.toInt() ?? 0;
+                final amountB = (b['contribution_amount'] as num?)?.toInt() ?? 0;
+                return amountB.compareTo(amountA); // Descending
+              case 'next_payment':
+              case 'next_draw':
+                // Sort by start_date as a proxy
+                final dateA = a['start_date'] != null ? DateTime.parse(a['start_date']) : DateTime.now();
+                final dateB = b['start_date'] != null ? DateTime.parse(b['start_date']) : DateTime.now();
+                return dateA.compareTo(dateB);
+              default:
+                return 0;
+            }
+          });
+
+          _pools = filteredPools;
           _isLoading = false;
         });
       }

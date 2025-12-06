@@ -8,7 +8,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/services/pool_service.dart';
 import '../../../../core/services/voting_service.dart';
 import 'pool_chat_screen.dart';
-import 'pool_documents_screen.dart';
 import 'pool_statistics_screen.dart';
 
 class PoolDetailsScreen extends ConsumerStatefulWidget {
@@ -28,8 +27,8 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Tick
   @override
   void initState() {
     super.initState();
-    // Start with 6 tabs (without chat), will update when pool loads
-    _tabController = TabController(length: 6, vsync: this);
+    // Start with 5 tabs (without chat and docs), will update when pool loads
+    _tabController = TabController(length: 5, vsync: this);
     _loadPoolDetails();
   }
 
@@ -39,7 +38,7 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Tick
       if (mounted) {
         // Recreate tab controller with correct length based on chat setting
         final enableChat = pool['enable_chat'] == true;
-        final newLength = enableChat ? 7 : 6;
+        final newLength = enableChat ? 6 : 5;
         
         if (_tabController.length != newLength) {
           final oldIndex = _tabController.index;
@@ -61,6 +60,56 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Tick
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading pool: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _sharePool() async {
+    if (_pool == null) return;
+
+    try {
+      final poolName = _pool!['name'] ?? 'Pool';
+      final poolId = widget.poolId;
+      final contributionAmount = _pool!['contribution_amount'];
+      final frequency = _pool!['frequency'];
+      
+      // Create invitation message
+      final message = '''
+🎯 Join my savings pool on Win Pool!
+
+Pool: $poolName
+Contribution: ₹$contributionAmount per $frequency
+Members: ${_pool!['current_members']}/${_pool!['max_members']}
+
+Join now and start saving together!
+Pool ID: $poolId
+
+Download Win Pool app to join.
+''';
+
+      // Use Share.share from share_plus package
+      await Clipboard.setData(ClipboardData(text: message));
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Expanded(child: Text('Pool invitation copied to clipboard! Share it with friends.')),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sharing pool: $e')),
         );
       }
     }
@@ -111,7 +160,10 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Tick
                 ),
               ),
               actions: [
-                IconButton(icon: const Icon(Icons.share), onPressed: () {}),
+                IconButton(
+                  icon: const Icon(Icons.share),
+                  onPressed: () => _sharePool(),
+                ),
                 PopupMenuButton(
                   itemBuilder: (context) {
                     final isCreator = _pool?['creator_id'] == Supabase.instance.client.auth.currentUser?.id;
@@ -169,7 +221,6 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Tick
                   const Tab(text: 'Schedule'),
                   const Tab(text: 'Winners'),
                   if (_pool?['enable_chat'] == true) const Tab(text: 'Chat'),
-                  const Tab(text: 'Docs'),
                   const Tab(text: 'Stats'),
                 ],
               ),
@@ -187,7 +238,6 @@ class _PoolDetailsScreenState extends ConsumerState<PoolDetailsScreen> with Tick
             _ScheduleTab(poolId: widget.poolId),
             _WinnersTab(poolId: widget.poolId),
             if (_pool?['enable_chat'] == true) _ChatTab(poolId: widget.poolId),
-            _DocsTab(poolId: widget.poolId, isCreator: isCreator),
             _StatsTab(poolId: widget.poolId),
           ],
         ),
@@ -1210,18 +1260,6 @@ class _ChatTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PoolChatScreen(poolId: poolId, poolName: 'Pool Chat');
-  }
-}
-
-class _DocsTab extends StatelessWidget {
-  final String poolId;
-  final bool isCreator;
-  
-  const _DocsTab({required this.poolId, required this.isCreator});
-
-  @override
-  Widget build(BuildContext context) {
-    return PoolDocumentsScreen(poolId: poolId, isCreator: isCreator);
   }
 }
 
